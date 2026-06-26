@@ -2,7 +2,7 @@
 
 Aja como um Arquiteto de Software Sênior especialista em Spring Boot, React, APIs REST, Arquitetura de Software, Clean Code, SOLID, Spec-Driven Development e aplicações preparadas para integração com Inteligência Artificial.
 
-## CONTEXTO
+## Contexto
 
 Estamos desenvolvendo o projeto acadêmico **MindJournal AI**, um diário pessoal inteligente utilizando React no front-end e Spring Boot no back-end.
 
@@ -12,23 +12,23 @@ Uma sessão representa uma entrada ou conversa do diário. Cada sessão pode pos
 
 O sistema deve contemplar:
 
-* criação de sessões de diário;
-* envio de mensagens em formato de chat;
-* recebimento de respostas textuais controladas de teste;
-* persistência das mensagens por ID de sessão;
-* listagem e recuperação do histórico;
-* upload de documentos nos formatos `.txt` e `.pdf`;
-* registro dos metadados básicos dos anexos;
-* interface drag-and-drop com progresso visual;
-* endpoint de monitoramento `GET /api/health`;
-* arquitetura preparada para futura integração com modelos de Inteligência Artificial.
+- criação de sessões de diário;
+- envio de mensagens em formato de chat;
+- recebimento de respostas textuais controladas de teste;
+- persistência das mensagens por ID de sessão;
+- listagem e recuperação do histórico;
+- upload de documentos nos formatos `.txt` e `.pdf`;
+- registro dos metadados básicos dos anexos;
+- interface drag-and-drop com progresso visual;
+- endpoint de monitoramento `GET /api/health`;
+- arquitetura preparada para futura integração com modelos de Inteligência Artificial.
 
-## INTENÇÃO
+## Intenção
 
 Crie dois Documentos de Especificação do Sistema:
 
-1. `backend-system-docs.md`
-2. `frontend-system-docs.md`
+1. `docs/specs/01-backend-architecture.md`
+2. `docs/specs/02-frontend-architecture.md`
 
 Esses documentos serão utilizados como fonte da verdade para a implementação futura e serão adicionados aos dois repositórios do projeto.
 
@@ -36,39 +36,39 @@ Não escreva o código final.
 
 O objetivo desta etapa é definir exclusivamente:
 
-* arquitetura;
-* responsabilidades;
-* contratos;
-* entidades;
-* componentes;
-* fluxos;
-* regras;
-* critérios de aceite.
+- arquitetura;
+- responsabilidades;
+- contratos;
+- entidades;
+- componentes;
+- fluxos;
+- regras;
+- critérios de aceite.
 
-## RESTRIÇÕES INEGOCIÁVEIS
+## Restrições inegociáveis
 
 1. Siga os princípios de Clean Code, SOLID, Spec-Driven Development e isolamento de domínio.
 
 2. No back-end:
 
-* Controllers devem atuar somente como fronteiras HTTP.
-* Controllers não podem conter regras de negócio.
-* Services devem concentrar a lógica da aplicação e a orquestração do domínio.
-* Services não devem depender de conceitos HTTP.
-* Repositories devem tratar exclusivamente o acesso aos dados.
-* DTOs devem representar os contratos de entrada e saída da API.
-* A camada de domínio não deve conhecer detalhes concretos de banco de dados ou transporte HTTP.
-* O endpoint `GET /api/health` é obrigatório.
-* O upload deve aceitar apenas arquivos `.txt` e `.pdf`.
+   - Controllers devem atuar somente como fronteiras HTTP.
+   - Controllers não podem conter regras de negócio.
+   - Services devem concentrar a lógica da aplicação e a orquestração do domínio.
+   - Services não devem depender de conceitos HTTP.
+   - Repositories devem tratar exclusivamente o acesso aos dados.
+   - DTOs devem representar os contratos de entrada e saída da API.
+   - As entidades podem utilizar anotações JPA, mas não devem possuir responsabilidades HTTP ou regras de orquestração da aplicação. As regras da aplicação e os Services não devem depender de detalhes concretos da persistência.
+   - O endpoint `GET /api/health` é obrigatório.
+   - O upload deve aceitar apenas arquivos `.txt` e `.pdf`.
 
 3. No front-end:
 
-* Componentes React devem ser responsáveis principalmente pela renderização.
-* Estado, efeitos colaterais e regras de comportamento devem permanecer em Custom Hooks.
-* Chamadas HTTP devem ser concentradas em uma camada de serviços.
-* Componentes visuais não devem realizar diretamente chamadas à API.
-* A interface deve respeitar princípios básicos de acessibilidade.
-* O upload deve oferecer drag-and-drop e progresso visual.
+   - Componentes React devem ser responsáveis principalmente pela renderização.
+   - Estado, efeitos colaterais e regras de comportamento devem permanecer em Custom Hooks.
+   - Chamadas HTTP devem ser concentradas em uma camada de serviços.
+   - Componentes visuais não devem realizar diretamente chamadas à API.
+   - A interface deve respeitar princípios básicos de acessibilidade.
+   - O upload deve oferecer drag-and-drop e progresso visual.
 
 4. A arquitetura deve permitir a futura substituição das respostas controladas por uma integração real com IA sem alterar o núcleo do domínio.
 
@@ -78,11 +78,11 @@ O objetivo desta etapa é definir exclusivamente:
 
 7. Não crie funcionalidades além do escopo sem apresentá-las primeiro como sugestão opcional.
 
-## PARÂMETROS DE SAÍDA
+## Parâmetros de saída
 
 Entregue a resposta em Markdown profissional e divida claramente o resultado nos dois documentos abaixo.
 
-### Documento 1 — `backend-system-docs.md`
+### Documento 1 — `docs/specs/01-backend-architecture.md`
 
 Deve conter:
 
@@ -91,24 +91,22 @@ Deve conter:
 3. Árvore de diretórios proposta.
 4. Responsabilidade de cada camada.
 5. Modelo conceitual das entidades:
-
-   * Session;
-   * Message;
-   * Attachment.
+   - Session;
+   - Message;
+   - Attachment.
 6. Relacionamentos entre as entidades.
 7. DTOs previstos.
 8. Controllers previstos.
 9. Services previstos.
 10. Repositories previstos.
 11. Tabela dos contratos da API REST contendo:
-
-    * método HTTP;
-    * rota;
-    * finalidade;
-    * parâmetros;
-    * payload de entrada;
-    * payload de saída;
-    * códigos de resposta.
+    - método HTTP;
+    - rota;
+    - finalidade;
+    - parâmetros;
+    - payload de entrada;
+    - payload de saída;
+    - códigos de resposta.
 12. Fluxo de criação de sessão.
 13. Fluxo de envio de mensagem.
 14. Fluxo de recuperação do histórico.
@@ -119,7 +117,7 @@ Deve conter:
 19. Critérios de aceite da primeira etapa.
 20. Estratégia para futura integração com IA.
 
-### Documento 2 — `frontend-system-docs.md`
+### Documento 2 — `docs/specs/02-frontend-architecture.md`
 
 Deve conter:
 
@@ -148,9 +146,9 @@ Deve conter:
 
 Inclua ao final:
 
-* suposições utilizadas na especificação;
-* decisões que precisam de validação da equipe;
-* riscos arquiteturais identificados;
-* funcionalidades consideradas fora do escopo da primeira etapa.
+- suposições utilizadas na especificação;
+- decisões que precisam de validação da equipe;
+- riscos arquiteturais identificados;
+- funcionalidades consideradas fora do escopo da primeira etapa.
 
 Não gere código até que os dois documentos sejam analisados e aprovados pela equipe.
