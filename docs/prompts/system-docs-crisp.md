@@ -1,8 +1,8 @@
-# Prompt para geração dos System Docs — MindJournal AI
+Prompt para geração dos System Docs — MindJournal AI
 
 Aja como um Arquiteto de Software Sênior especialista em Spring Boot, React, APIs REST, Arquitetura de Software, Clean Code, SOLID, Spec-Driven Development e aplicações preparadas para integração com Inteligência Artificial.
 
-## CONTEXTO
+CONTEXTO
 
 Estamos desenvolvendo o projeto acadêmico **MindJournal AI**, um diário pessoal inteligente utilizando React no front-end e Spring Boot no back-end.
 
@@ -23,12 +23,12 @@ O sistema deve contemplar:
 * endpoint de monitoramento `GET /api/health`;
 * arquitetura preparada para futura integração com modelos de Inteligência Artificial.
 
-## INTENÇÃO
+INTENÇÃO
 
 Crie dois Documentos de Especificação do Sistema:
 
-1. `backend-system-docs.md`
-2. `frontend-system-docs.md`
+1. docs/specs/01-backend-architecture.md
+2. docs/specs/02-frontend-architecture.md
 
 Esses documentos serão utilizados como fonte da verdade para a implementação futura e serão adicionados aos dois repositórios do projeto.
 
@@ -45,7 +45,7 @@ O objetivo desta etapa é definir exclusivamente:
 * regras;
 * critérios de aceite.
 
-## RESTRIÇÕES INEGOCIÁVEIS
+RESTRIÇÕES INEGOCIÁVEIS
 
 1. Siga os princípios de Clean Code, SOLID, Spec-Driven Development e isolamento de domínio.
 
@@ -78,11 +78,11 @@ O objetivo desta etapa é definir exclusivamente:
 
 7. Não crie funcionalidades além do escopo sem apresentá-las primeiro como sugestão opcional.
 
-## PARÂMETROS DE SAÍDA
+PARÂMETROS DE SAÍDA
 
 Entregue a resposta em Markdown profissional e divida claramente o resultado nos dois documentos abaixo.
 
-### Documento 1 — `backend-system-docs.md`
+Documento 1 — `docs/specs/01-backend-architecture.md`
 
 Deve conter:
 
@@ -119,7 +119,7 @@ Deve conter:
 19. Critérios de aceite da primeira etapa.
 20. Estratégia para futura integração com IA.
 
-### Documento 2 — `frontend-system-docs.md`
+Documento 2 — `docs/specs/02-frontend-architecture.md`
 
 Deve conter:
 
@@ -144,7 +144,7 @@ Deve conter:
 19. Critérios de aceite da primeira etapa.
 20. Estratégia para futura apresentação das respostas de IA.
 
-### Seção final obrigatória
+Seção final obrigatória
 
 Inclua ao final:
 
