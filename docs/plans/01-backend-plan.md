@@ -31,7 +31,7 @@ Inicializar o projeto Spring Boot com as dependências corretas e configurar o a
    - `spring.jpa.show-sql: false`
    - `spring.h2.console.enabled: true`
    - `spring.servlet.multipart.max-file-size: 10MB`
-   - `spring.servlet.multipart.max-request-size: 10MB`
+   - `spring.servlet.multipart.max-request-size: 11MB`
 3. Criar classe principal `MindJournalApplication` com `@SpringBootApplication`
 
 ### Contratos da API afetados
@@ -69,6 +69,7 @@ Criar as entidades JPA e os enums que representam o domínio.
 - `src/main/java/com/mindjournal/model/Message.java`
 - `src/main/java/com/mindjournal/model/Attachment.java`
 - `src/main/java/com/mindjournal/model/Sender.java`
+- `src/main/java/com/mindjournal/model/AttachmentType.java`
 
 ### Tarefas de implementação
 1. Criar enum `Sender` com valores `USER` e `ASSISTANT`
@@ -137,7 +138,7 @@ Criar os DTOs dos contratos da API e o tratamento global de erros.
 
 ### Validações necessárias
 - `@NotNull` e `@NotBlank` nos campos obrigatórios de DTOs
-- Tamanho máximo do conteúdo da mensagem (definir limite)
+- Conteúdo da mensagem não pode ser vazio
 
 ### Testes manuais recomendados
 - Nenhum (testado via controllers nas fases seguintes)
@@ -208,11 +209,12 @@ Implementar a lógica de negócio para sessões e mensagens.
 - `src/main/java/com/mindjournal/service/MessageService.java`
 
 ### Tarefas de implementação
-1. Criar `SessionService`:
-   - `listSessions()` → retorna `List<SessionDTO>` ordenado por `updatedAt` desc
-   - `getSession(Long id)` → retorna `SessionDTO` ou lança exceção (404)
-    - `createSession(CreateSessionRequest)` → se `title` for nulo ou vazio, define como `"Nova sessão"`; cria `Session`, persiste, retorna `SessionDTO`
-    - `touchSession(Long id)` → busca sessão por id, atualiza `updatedAt` para `Instant.now()`, persiste
+1. Criar `SessionService` com três métodos de acesso à sessão:
+    - `getSession(Long id)`: retorna `SessionDTO` — usado pelos Controllers para responder à API
+    - `requireSession(Long id)`: retorna a entidade `Session` — usado internamente por `MessageService`, `ChatService` e `AttachmentService`; lança exceção se não encontrada; **nunca chamado por Controllers**
+    - `touchSession(Long id)`: atualiza `updatedAt` da sessão para `Instant.now()` e persiste
+    - `listSessions()` → retorna `List<SessionDTO>` ordenado por `updatedAt` desc
+    - `createSession(CreateSessionRequest)` → se `title` for nulo, vazio ou apenas espaços, define como `"Nova sessão"`; cria `Session`, persiste, retorna `SessionDTO`
 2. Criar `MessageService`:
    - `getMessagesBySessionId(Long sessionId)` → valida existência da sessão via `SessionService`, retorna `List<MessageDTO>` ordenado por `timestamp` asc
    - `createMessage(Session session, Sender sender, String content)` → cria e persiste `Message`, retorna `MessageDTO`
@@ -334,7 +336,7 @@ Expor os endpoints de health check, sessões e chat.
 
 ### Critérios de aceite
 - [ ] `GET /api/health` funcional
-- [ ] CRUD de sessões funcional (criar, listar, buscar)
+- [ ] Operações de criação, listagem e busca de sessões funcionais
 - [ ] Chat funcional com resposta simulada
 - [ ] Histórico de mensagens funcional
 - [ ] Nenhum controller contém regra de negócio

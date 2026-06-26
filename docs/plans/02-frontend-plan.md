@@ -74,57 +74,17 @@ Criar a estrutura completa de diretórios e definir as interfaces TypeScript que
 ### Tarefas de implementação
 1. Criar estrutura de diretórios: `components/`, `hooks/`, `services/`, `types/`, `utils/`
 2. Criar `types/session.ts`:
-   ```typescript
-   export interface Session {
-     id: number;
-     title: string;
-     createdAt: string; // ISO 8601
-     updatedAt: string; // ISO 8601
-   }
-   ```
+   - `Session`: `id` (number), `title` (string), `createdAt` (string ISO 8601), `updatedAt` (string ISO 8601)
 3. Criar `types/message.ts`:
-   ```typescript
-   export type Sender = 'USER' | 'ASSISTANT';
-
-   export interface Message {
-     id: number;
-     sessionId: number;
-     sender: Sender;
-     content: string;
-     timestamp: string; // ISO 8601
-   }
-
-   export interface ChatResponse {
-     userMessage: Message;
-     assistantMessage: Message;
-   }
-   ```
+   - `Sender`: `'USER' | 'ASSISTANT'`
+   - `Message`: `id` (number), `sessionId` (number), `sender` (Sender), `content` (string), `timestamp` (string ISO 8601)
+   - `ChatResponse`: `userMessage` (Message), `assistantMessage` (Message)
 4. Criar `types/attachment.ts`:
-   ```typescript
-   export type AttachmentType = 'TXT' | 'PDF';
-
-   export interface Attachment {
-     id: number;
-     sessionId: number;
-     filename: string;
-     type: AttachmentType;
-     size: number;
-     uploadDate: string; // ISO 8601
-   }
-   ```
+   - `AttachmentType`: `'TXT' | 'PDF'`
+   - `Attachment`: `id` (number), `sessionId` (number), `filename` (string), `type` (AttachmentType), `size` (number), `uploadDate` (string ISO 8601)
 5. Criar `types/api.ts`:
-   ```typescript
-   export interface ProblemDetail {
-     status: number;
-     title: string;
-     detail: string;
-   }
-
-   export interface HealthStatus {
-     status: 'UP' | 'DOWN';
-     timestamp: string;
-   }
-   ```
+   - `ProblemDetail`: `status` (number), `title` (string), `detail` (string)
+   - `HealthStatus`: `status` (`'UP' | 'DOWN'`), `timestamp` (string ISO 8601)
 
 ### Testes manuais recomendados
 - Verificar se `npm run build` compila sem erros de tipo
@@ -364,6 +324,7 @@ Implementar o gerenciamento de sessões com criação e listagem.
 - Carregar sessões no mount
 - Criar sessão via `POST /api/sessions`
 - Selecionar sessão e definir `activeSessionId`
+- `refreshSessions()`: recarregar lista via `GET /api/sessions` — chamado por `App` após envio de mensagem e upload bem-sucedidos
 
 ### Tarefas de implementação
 1. Implementar `useSessions`:
@@ -441,11 +402,13 @@ Implementar o carregamento do histórico e envio de mensagens.
 1. Implementar `useMessages`:
    - Estados
    - `loadMessages(sessionId)` → `GET /api/sessions/{id}/messages`
-   - `sendMessage(content)` → `POST /api/chat`
-   - `useEffect` monitorando `activeSessionId` para carregar histórico
-   - Mensagem otimista do usuário substituída pela resposta real
+    - `sendMessage(content)` → `POST /api/chat`
+    - `useEffect` monitorando `activeSessionId` para carregar histórico
+    - Mensagem otimista do usuário substituída pela resposta real
+    - Após envio bem-sucedido, chamar callback `onMessageSent` para que `App` invoque `refreshSessions()`
 2. Atualizar `App.tsx`:
    - Consumir `useMessages` passando `activeSessionId`
+   - Conectar callback `onMessageSent` para chamar `refreshSessions()` do `useSessions`
    - Passar props para `ChatArea`, `ChatInput`
 3. Atualizar `ChatArea`:
    - Renderizar lista de `MessageBubble`
@@ -522,8 +485,10 @@ Implementar o upload de arquivos com drag-and-drop, validação client-side e ba
      - Valida tipo, extensão e tamanho
      - Se inválido → define `error` sem chamar API
      - Se válido e sessão ativa → chama `uploadService.upload` com callback de progresso
-   - UploadService retorna erro → exibe `ProblemDetail`
-   - Após 3 segundos, feedback é removido
+    - UploadService retorna erro → exibe `ProblemDetail`
+    - Erros client-side (tipo inválido, extensão, tamanho) usam `ProblemDetail` com `status: 400`, `title: "Arquivo inválido"`, `detail` descritivo
+    - Após upload bem-sucedido, chamar callback `onUploadComplete` para que `App` invoque `refreshSessions()`
+    - Após 3 segundos, feedback é removido
 2. Atualizar `UploadZone`:
    - Remover lógica de validação (apenas entrega o arquivo via `onFileSelected`)
    - Drag-and-drop com `onDrop` e `onChange` do input file
@@ -536,6 +501,7 @@ Implementar o upload de arquivos com drag-and-drop, validação client-side e ba
    - `role="progressbar"` com atributos ARIA
 4. Atualizar `App.tsx`:
    - Consumir `useUpload` passando `activeSessionId`
+   - Conectar callback `onUploadComplete` para chamar `refreshSessions()` do `useSessions`
    - Passar props para `UploadZone` e `ProgressBar`
 
 ### Testes manuais recomendados
@@ -702,13 +668,7 @@ Realizar testes ponta a ponta e ajustar detalhes de integração.
 
 ### Tarefas de implementação
 1. Configurar proxy no `vite.config.ts` (opcional, como alternativa ao CORS):
-   ```typescript
-   server: {
-     proxy: {
-       '/api': 'http://localhost:8080'
-     }
-   }
-   ```
+   - `server.proxy['/api']` apontando para `http://localhost:8080`
 2. Testar fluxo completo:
    - Aplicação inicia → HealthIndicator fica verde
    - Criar sessão → Sidebar atualiza
