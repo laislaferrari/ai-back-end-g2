@@ -1,5 +1,0 @@
-controller
-service
-repository
-model
-dto
