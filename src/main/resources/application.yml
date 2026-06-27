@@ -2,11 +2,15 @@ server:
   port: 8080
 
 spring:
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
   datasource:
     url: jdbc:h2:file:./data/mindjournal
     driver-class-name: org.h2.Driver
     username: sa
-    password: ""
+    password: "120823"
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
