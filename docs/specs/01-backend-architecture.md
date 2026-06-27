@@ -1,510 +1,341 @@
-# Arquitetura do Back-end — MindJourney IA
+# Back-end System Docs — MindJournal AI
 
-## Visão geral
+## 1. Visão geral do back-end
 
-O back-end do MindJourney IA utiliza uma arquitetura em camadas baseada no Spring Boot.
+Sistema de diário pessoal inteligente com API REST simulando respostas de IA, gerenciamento de sessões de conversa, histórico de mensagens e upload de arquivos TXT/PDF. Construído com Spring Boot 3, Java 17 e Maven, exposto na porta 8080.
 
-Cada camada possui uma responsabilidade específica, reduzindo o acoplamento e facilitando a manutenção, os testes e a evolução do projeto.
+## 2. Objetivos da API
 
-A estrutura principal segue este fluxo:
+- Servir como fonte da verdade para o front-end React
+- Gerenciar criação e recuperação de sessões de diário
+- Receber mensagens do usuário e retornar respostas textuais simuladas
+- Persistir e recuperar histórico de mensagens por sessão
+- Receber upload de arquivos TXT e PDF com validação
+- Registrar metadados dos arquivos anexados
+- Expor endpoint de monitoramento da saúde da API
+- Ser preparada para futura substituição das respostas simuladas por integração real com IA
 
-```text
-Front-end
-    ↓
-Controller
-    ↓
-Service
-    ↓
-Repository
-    ↓
-Banco H2
+## 3. Árvore de diretórios proposta
+
+```
+src/
+├── main/
+│   ├── java/com/mindjournal/
+│   │   ├── controller/
+│   │   ├── service/
+│   │   ├── repository/
+│   │   ├── model/
+│   │   ├── dto/
+│   │   ├── config/
+│   │   └── exception/
+│   └── resources/
+│       └── application.yml
+└── test/
+    └── java/com/mindjournal/
 ```
 
-## Estrutura de pastas
+## 4. Responsabilidade de cada camada
 
-```text
-src/main/java/com/mindjournal/
-├── controller/
-├── dto/
-├── entity/
-├── exception/
-├── repository/
-├── service/
-└── MindJournalApplication.java
-```
+| Camada | Responsabilidade |
+|--------|----------------|
+| controller | Fronteira HTTP — recebe requisições, delega para services, converte e retorna respostas. Sem regras de negócio. |
+| service | Lógica da aplicação e orquestração do domínio. Independe de conceitos HTTP. Contém todas as validações de negócio. |
+| repository | Acesso exclusivo a dados (JPA/Hibernate). Apenas queries e persistência. |
+| model | Entidades de domínio — Session, Message, Attachment. Podem utilizar anotações JPA, mas não devem conter responsabilidades HTTP ou regras de orquestração da aplicação. |
+| dto | Contratos de entrada e saída da API. Imutáveis, sem lógica de negócio. |
+| config | Configurações da aplicação (CORS, upload size, IA strategy). |
+| exception | Tratamento global de erros com `@ControllerAdvice` e `ProblemDetail` (RFC 9457). |
 
-```text
-src/main/resources/
-└── application.yml
-```
-
-## Classe principal
-
-A classe:
-
-```text
-MindJournalApplication.java
-```
-
-é responsável por inicializar a aplicação Spring Boot.
-
-Ela utiliza a anotação:
-
-```java
-@SpringBootApplication
-```
-
-Essa anotação habilita a configuração automática do Spring e o escaneamento dos componentes presentes no pacote `com.mindjournal` e em seus subpacotes.
-
-## Controller
-
-A camada `controller` recebe as requisições HTTP enviadas pelo front-end.
-
-Suas responsabilidades são:
-
-* Definir as rotas da API.
-* Receber parâmetros e corpos de requisição.
-* Aplicar validações.
-* Chamar os métodos da camada de service.
-* Retornar respostas HTTP.
-
-Exemplos:
-
-```text
-HealthController
-SessionController
-```
-
-O controller não deve concentrar regras de negócio.
-
-## Service
-
-A camada `service` concentra as regras da aplicação.
-
-Suas responsabilidades são:
-
-* Criar sessões.
-* Buscar sessões.
-* Validar a existência de registros.
-* Definir a ordem dos resultados.
-* Converter entidades em DTOs.
-* Coordenar o acesso aos repositórios.
-* Lançar exceções quando necessário.
-
-Exemplo:
-
-```text
-SessionService
-```
-
-## Repository
-
-A camada `repository` realiza o acesso ao banco de dados.
-
-Os repositórios utilizam o Spring Data JPA e herdam de:
-
-```java
-JpaRepository
-```
-
-Exemplos:
-
-```text
-SessionRepository
-MessageRepository
-```
-
-Métodos utilizados:
-
-```java
-List<Session> findAllByOrderByUpdatedAtDesc();
-```
-
-Esse método lista as sessões da mais recentemente atualizada para a mais antiga.
-
-```java
-List<Message> findBySession_IdOrderByTimestampAsc(Long sessionId);
-```
-
-Esse método lista as mensagens da mais antiga para a mais recente.
-
-## Entity
-
-A camada `entity` representa as tabelas persistidas no banco de dados.
+## 5. Modelo conceitual das entidades
 
 ### Session
 
-Representa uma sessão do diário.
-
-Campos principais:
-
-```text
-id
-title
-createdAt
-updatedAt
-```
-
-A tabela utiliza o nome:
-
-```text
-journal_sessions
-```
-
-Esse nome evita possíveis conflitos com a palavra `session` no banco de dados.
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| id | Long (PK) | Identificador único |
+| title | String | Título opcional da sessão (padrão `"Nova sessão"` quando ausente/vazio, retornado sempre não nulo no DTO) |
+| createdAt | Instant (ISO 8601 UTC) | Data de criação |
+| updatedAt | Instant (ISO 8601 UTC) | Data da última atividade |
 
 ### Message
 
-Representa uma mensagem de uma sessão.
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| id | Long (PK) | Identificador único |
+| session | Session (FK) | Sessão à qual pertence |
+| sender | Enum (USER / ASSISTANT) | Remetente da mensagem |
+| content | String (TEXT) | Conteúdo textual |
+| timestamp | Instant (ISO 8601 UTC) | Data e hora do envio |
 
-Campos principais:
+### Attachment
 
-```text
-id
-content
-role
-timestamp
-session
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| id | Long (PK) | Identificador único |
+| session | Session (FK) | Sessão à qual pertence |
+| filename | String | Nome original do arquivo |
+| type | Enum (TXT / PDF) | Tipo do arquivo |
+| size | Long | Tamanho em bytes |
+| filePath | String | Caminho de armazenamento |
+| uploadDate | Instant (ISO 8601 UTC) | Data do upload |
+
+## 6. Relacionamentos entre as entidades
+
+```
+Session ──1:N──> Message
+Session ──1:N──> Attachment
 ```
 
-Cada mensagem pertence a uma sessão.
+- Uma sessão pode conter zero ou muitas mensagens.
+- Uma sessão pode conter zero ou muitos anexos.
+- Mensagens e anexos pertencem a uma única sessão.
 
-A relação utilizada é:
+## 7. DTOs previstos
 
-```java
-@ManyToOne
+| DTO | Uso |
+|-----|-----|
+| ChatRequest | Payload de entrada do `POST /api/chat` — `sessionId`, `content` |
+| ChatResponse | Payload de saída do `POST /api/chat` — `userMessage` (MessageDTO), `assistantMessage` (MessageDTO) |
+| SessionDTO | Representação de uma sessão — `id`, `title` (não nulo), `createdAt`, `updatedAt` |
+| CreateSessionRequest | Payload de criação de sessão — `title` (opcional, padrão `"Nova sessão"`) |
+| MessageDTO | Representação de uma mensagem — `id`, `sessionId`, `sender`, `content`, `timestamp` |
+| AttachmentDTO | Representação de um anexo — `id`, `sessionId`, `filename`, `type`, `size`, `uploadDate` |
+| HealthDTO | Resposta do health check — `status`, `timestamp` |
+
+## 8. Controllers previstos
+
+| Controller | Endpoints |
+|------------|-----------|
+| HealthController | `GET /api/health` |
+| SessionController | `POST /api/sessions`, `GET /api/sessions`, `GET /api/sessions/{id}` |
+| ChatController | `POST /api/chat` |
+| MessageController | `GET /api/sessions/{id}/messages` |
+| AttachmentController | `POST /api/upload`, `GET /api/sessions/{id}/attachments` (opcional Etapa 1) |
+
+O AttachmentController recebe o `MultipartFile` e o converte para um objeto de entrada independente de HTTP (nome, tipo MIME, tamanho, conteúdo do arquivo e `sessionId`) antes de chamar AttachmentService.
+
+## 9. Services previstos
+
+| Service | Responsabilidade |
+|---------|----------------|
+| SessionService | Gerenciamento de sessões com três métodos principais: `getSession(Long id)` retorna `SessionDTO` (uso nos Controllers); `requireSession(Long id)` retorna a entidade `Session` e lança exceção quando não encontrada (uso interno de outros Services, nunca chamado por Controllers); `touchSession(Long id)` atualiza `updatedAt` para o instante atual. Oferece ainda `listSessions()` (ordenado por `updatedAt` desc) e `createSession(CreateSessionRequest)` — quando `title` é ausente/vazio, define como `"Nova sessão"`. |
+| MessageService | Persistir mensagens e recuperar histórico por sessão ordenado por timestamp crescente. Utiliza `SessionService.requireSession()` internamente para validar existência da sessão. |
+| ChatService | Orquestrar recebimento de mensagem, validar existência da sessão via `SessionService.requireSession()`, persistir mensagens, atualizar `updatedAt` da sessão via `SessionService.touchSession()` e gerar resposta simulada. |
+| AttachmentService | Processar upload, validar tipo/extensão/tamanho, validar existência da sessão via `SessionService.requireSession()`, salvar arquivo e metadados, atualizar `updatedAt` da sessão via `SessionService.touchSession()`. Não recebe `MultipartFile` diretamente — recebe nome, tipo MIME, tamanho, conteúdo do arquivo e `sessionId`. |
+| AiResponseGenerator | Interface para geração de respostas (mock agora, IA real no futuro). |
+
+## 10. Repositories previstos
+
+| Repository | Entidade |
+|------------|----------|
+| SessionRepository | Session |
+| MessageRepository | Message |
+| AttachmentRepository | Attachment |
+
+## 11. Tabela dos contratos da API REST
+
+| Método | Rota | Finalidade | Parâmetros | Payload de entrada | Payload de saída | Códigos |
+|--------|------|------------|------------|-------------------|------------------|---------|
+| GET | `/api/health` | Verificar saúde da API | — | — | `{"status":"UP","timestamp":"2026-06-26T10:00:00Z"}` | 200 |
+| POST | `/api/sessions` | Criar nova sessão | — | `{"title":"string"}` | SessionDTO | 201 |
+| GET | `/api/sessions` | Listar todas as sessões | — | — | [SessionDTO] (ordenado por updatedAt desc) | 200 |
+| GET | `/api/sessions/{id}` | Buscar sessão por ID | path: id | — | SessionDTO | 200, 404 |
+| POST | `/api/chat` | Enviar mensagem e receber resposta | — | `{"sessionId":1,"content":"..."}` | `{"userMessage":MessageDTO,"assistantMessage":MessageDTO}` | 201, 404 |
+| GET | `/api/sessions/{id}/messages` | Recuperar histórico de mensagens | path: id | — | [MessageDTO] (ordenado por timestamp asc) | 200, 404 |
+| POST | `/api/upload` | Fazer upload de arquivo | multipart: file, sessionId | file (TXT/PDF), sessionId (obrigatório) | AttachmentDTO | 201, 400, 404 |
+| GET | `/api/sessions/{id}/attachments` | Listar anexos de uma sessão (opcional Etapa 1) | path: id | — | [AttachmentDTO] | 200, 404 |
+
+## 12. Fluxo de criação de sessão
+
+1. Usuário clica em "Nova sessão" no front-end.
+2. Front-end envia `POST /api/sessions` com `title` opcional.
+3. SessionController recebe a requisição, converte para `CreateSessionRequest` e delega para SessionService.
+4. SessionService cria entidade `Session` com `createdAt` e `updatedAt`.
+5. SessionRepository persiste a entidade no banco.
+6. SessionController retorna `SessionDTO` com status 201.
+7. Front-end atualiza a lista de sessões.
+
+## 13. Fluxo de envio de mensagem
+
+1. Usuário digita mensagem e pressiona Enter no front-end.
+2. Front-end envia `POST /api/chat` com `{"sessionId":1,"content":"..."}`.
+3. ChatController recebe a requisição, converte para `ChatRequest` e delega para ChatService.
+4. ChatService valida existência da sessão via `SessionService.requireSession()`.
+5. ChatService persiste a mensagem do usuário via MessageService.
+6. ChatService invoca AiResponseGenerator para obter resposta simulada.
+7. Resposta simulada é persistida como mensagem do assistente via MessageService.
+8. ChatService atualiza `updatedAt` da sessão via `SessionService.touchSession()`.
+9. ChatController retorna `{"userMessage":MessageDTO,"assistantMessage":MessageDTO}` com status 201.
+10. Front-end exibe ambas as mensagens no chat.
+
+## 14. Fluxo de recuperação do histórico
+
+1. Usuário seleciona uma sessão no front-end.
+2. Front-end envia `GET /api/sessions/{id}/messages`.
+3. MessageController recebe a requisição e delega para MessageService.
+4. MessageService valida existência da sessão via `SessionService.requireSession()`.
+5. MessageService busca mensagens ordenadas por timestamp ascendente.
+6. MessageController retorna lista de `MessageDTO` com status 200.
+7. Front-end renderiza as mensagens no chat.
+
+## 15. Fluxo de upload de documentos
+
+1. Usuário arrasta arquivo ou clica para selecionar no front-end.
+2. Front-end envia `POST /api/upload` com `multipart/form-data` contendo `file` e `sessionId` (obrigatório).
+3. AttachmentController recebe o `MultipartFile` e extrai nome, tipo MIME, tamanho, conteúdo e `sessionId`, convertendo para um objeto de entrada sem dependência HTTP; delega para AttachmentService.
+4. AttachmentService recebe nome, tipo MIME, tamanho, conteúdo do arquivo e `sessionId`; valida existência da sessão via `SessionService.requireSession()`.
+5. AttachmentService valida extensão (`.txt`, `.pdf`), tipo MIME e tamanho máximo (10 MB).
+6. Arquivo é salvo no sistema de arquivos (diretório configurável).
+7. AttachmentService persiste metadados via AttachmentRepository.
+8. AttachmentService atualiza `updatedAt` da sessão via `SessionService.touchSession()`.
+9. AttachmentController retorna `AttachmentDTO` com status 201.
+10. Em caso de arquivo inválido ou sessão inexistente, retorna 400 ou 404 com `ProblemDetail`.
+11. Front-end exibe progresso durante o upload e confirmação ao final.
+
+## 16. Estratégia de persistência relacional
+
+- H2 em modo arquivo na primeira etapa (URL `jdbc:h2:file:./data/mindjournal`), garantindo persistência após reinicialização.
+- PostgreSQL reservado como possibilidade futura de migração.
+- JPA / Hibernate com `spring-boot-starter-data-jpa`.
+- Esquema gerado automaticamente pelas entidades (`ddl-auto: update`).
+- `schema.sql` não será utilizado — o schema é gerenciado exclusivamente pelo JPA.
+- Relacionamentos:
+  - `Session` → `Message`: `@OneToMany(mappedBy = "session", cascade = ALL)`
+  - `Session` → `Attachment`: `@OneToMany(mappedBy = "session", cascade = ALL)`
+  - `Message` → `Session`: `@ManyToOne(fetch = LAZY)`
+  - `Attachment` → `Session`: `@ManyToOne(fetch = LAZY)`
+- Índices em `session_id` nas tabelas `messages` e `attachments` para consultas por sessão.
+
+## 17. Validações e tratamento de erros
+
+- Arquivos: apenas `.txt` e `.pdf`; tamanho máximo: 10 MB; um arquivo por requisição.
+- Mensagens: conteúdo não pode ser vazio ou apenas espaços.
+- Sessão: validação de existência em operações que referenciam `sessionId` — realizada nos Services, nunca nos Controllers.
+- Tratamento global: `@ControllerAdvice` com `ProblemDetail` (RFC 9457).
+- Campos do `ProblemDetail` utilizados pelo front-end: `status` (int), `title` (string), `detail` (string).
+
+Códigos de erro:
+
+| Código | Significado |
+|--------|-------------|
+| 400 | Bad Request (arquivo inválido, conteúdo vazio, extensão não permitida) |
+| 404 | Not Found (sessão inexistente) |
+| 413 | Payload Too Large (arquivo excede 10 MB) |
+| 500 | Internal Server Error (falhas não esperadas) |
+
+## 18. Restrições arquiteturais
+
+- [ ] Controllers atuam somente como fronteira HTTP — recebem, convertem e delegam; sem regras de negócio.
+- [ ] Validação de existência de sessão ocorre nos Services, nunca nos Controllers.
+- [ ] Validação de tipo, extensão e tamanho do arquivo ocorre no AttachmentService.
+- [ ] Services concentram lógica e orquestração — sem dependências de `HttpServletRequest`, `MultipartFile`, etc.
+- [ ] Repositories tratam exclusivamente acesso a dados — sem lógica de negócio.
+- [ ] DTOs representam contratos de entrada/saída — imutáveis, sem lógica.
+- [ ] Camada de domínio não conhece detalhes concretos de banco ou transporte HTTP.
+- [ ] `GET /api/health` é obrigatório.
+- [ ] Upload aceita apenas `.txt` e `.pdf`, um arquivo por requisição, com `sessionId` obrigatório.
+- [ ] Arquitetura preparada para substituição futura da resposta simulada por IA real sem alterar o núcleo do domínio.
+- [ ] Datas e horários em formato ISO 8601 UTC (`Instant`).
+- [ ] Sessões listadas por `updatedAt` decrescente.
+- [ ] Mensagens listadas por `timestamp` crescente.
+- [ ] Toda nova mensagem e todo novo anexo atualizam o campo `updatedAt` da sessão via `SessionService.touchSession()`.
+- [ ] `title` no `SessionDTO` sempre não nulo (padrão `"Nova sessão"` quando ausente).
+
+## 19. Critérios de aceite da primeira etapa
+
+- [ ] `GET /api/health` retorna 200 com status UP.
+- [ ] `POST /api/sessions` cria sessão e retorna 201 com dados da sessão.
+- [ ] `GET /api/sessions` retorna lista de sessões ordenada por `updatedAt` desc (pode ser vazia).
+- [ ] `GET /api/sessions/{id}` retorna sessão específica ou 404.
+- [ ] `POST /api/chat` com `sessionId` válido persiste ambas as mensagens e retorna 201 com `userMessage` e `assistantMessage`.
+- [ ] `POST /api/chat` com `sessionId` inválido retorna 404.
+- [ ] `GET /api/sessions/{id}/messages` retorna histórico ordenado por `timestamp` asc ou 404.
+- [ ] `POST /api/upload` com `sessionId` válido e `.txt`/`.pdf` válido salva arquivo e metadados, retorna 201.
+- [ ] `POST /api/upload` sem `sessionId` retorna 400.
+- [ ] `POST /api/upload` com `sessionId` inválido retorna 404.
+- [ ] `POST /api/upload` com tipo inválido retorna 400 com `ProblemDetail`.
+- [ ] `POST /api/upload` com arquivo > 10 MB retorna 413 com `ProblemDetail`.
+- [ ] `GET /api/sessions/{id}/attachments` é opcional e não bloqueia os requisitos mínimos.
+- [ ] Nenhum controller contém regra de negócio.
+- [ ] Nenhum service depende de objetos HTTP.
+- [ ] DTOs são imutáveis.
+- [ ] Erros utilizam `ProblemDetail` com campos `status`, `title` e `detail`.
+
+## 20. Estratégia para futura integração com IA
+
+Definir interface `AiResponseGenerator` no domínio:
+
 ```
-
-Isso significa que uma sessão pode possuir várias mensagens.
-
-### MessageRole
-
-Enum utilizado para identificar quem enviou a mensagem.
-
-Valores:
-
-```text
-USER
-ASSISTANT
-```
-
-## DTO
-
-A camada `dto` define os dados de entrada e saída da API.
-
-Ela evita que as entidades do banco sejam expostas diretamente ao front-end.
-
-DTOs atuais:
-
-```text
-CreateSessionRequest
-SessionResponse
-MessageResponse
-```
-
-### CreateSessionRequest
-
-Utilizado para receber o título de uma nova sessão.
-
-Exemplo:
-
-```json
-{
-  "title": "Meu diário de hoje"
+interface AiResponseGenerator {
+    String generateResponse(Long sessionId, String userMessage);
 }
 ```
 
-### SessionResponse
-
-Utilizado para devolver os dados de uma sessão.
-
-Campos:
-
-```text
-id
-title
-createdAt
-updatedAt
-```
-
-### MessageResponse
-
-Utilizado para devolver os dados de uma mensagem.
-
-Campos:
-
-```text
-id
-content
-role
-timestamp
-```
-
-## Validação
-
-A validação dos dados recebidos utiliza Bean Validation.
-
-Exemplo:
-
-```java
-@NotBlank
-@Size(max = 150)
-```
-
-O título de uma sessão:
-
-* Não pode ser vazio.
-* Deve possuir no máximo 150 caracteres.
-
-As validações são ativadas no controller por meio de:
-
-```java
-@Valid
-```
-
-## Tratamento de erros
-
-O projeto utiliza uma classe global de tratamento de exceções:
-
-```text
-GlobalExceptionHandler
-```
-
-Ela utiliza:
-
-```java
-@RestControllerAdvice
-```
-
-As respostas de erro seguem o padrão `ProblemDetail` do Spring.
-
-### Sessão inexistente
-
-Quando uma sessão não é encontrada, a API retorna:
-
-```text
-HTTP 404
-```
-
-Exemplo:
-
-```json
-{
-  "type": "about:blank",
-  "title": "Sessão não encontrada",
-  "status": 404,
-  "detail": "Não foi encontrada uma sessão com o ID 999."
-}
-```
-
-### Dados inválidos
-
-Quando os dados enviados não passam pela validação, a API retorna:
-
-```text
-HTTP 400
-```
-
-Exemplo:
-
-```json
-{
-  "type": "about:blank",
-  "title": "Dados inválidos",
-  "status": 400,
-  "detail": "O título da sessão é obrigatório."
-}
-```
-
-## Banco de dados
-
-Durante a primeira etapa, o projeto utiliza H2 persistido em arquivo.
-
-URL de conexão:
-
-```text
-jdbc:h2:file:./data/mindjournal
-```
-
-Usuário:
-
-```text
-sa
-```
-
-Senha:
-
-```text
-vazia
-```
-
-O banco é armazenado localmente em:
-
-```text
-data/mindjournal.mv.db
-```
-
-A pasta `data` não deve ser versionada.
-
-## Configuração JPA
-
-O Hibernate está configurado com:
-
-```yaml
-ddl-auto: update
-```
-
-Isso permite que as tabelas sejam criadas ou atualizadas automaticamente a partir das entidades.
-
-O projeto também utiliza:
-
-```yaml
-open-in-view: false
-```
-
-Essa configuração evita que sessões do banco permaneçam abertas durante toda a resposta HTTP.
-
-## Datas e horários
-
-As entidades utilizam:
-
-```java
-Instant
-```
-
-Isso permite armazenar datas e horários em UTC.
-
-As datas são preenchidas automaticamente por meio de:
-
-```java
-@PrePersist
-@PreUpdate
-```
-
-`createdAt` é criado no primeiro salvamento.
-
-`updatedAt` é atualizado sempre que uma sessão é modificada.
-
-## Fluxo de criação de sessão
-
-```text
-POST /api/sessions
-        ↓
-SessionController
-        ↓
-SessionService
-        ↓
-SessionRepository
-        ↓
-Banco H2
-        ↓
-SessionResponse
-```
-
-## Fluxo de listagem
-
-```text
-GET /api/sessions
-        ↓
-SessionController
-        ↓
-SessionService
-        ↓
-SessionRepository
-        ↓
-Ordenação por updatedAt
-        ↓
-Lista de SessionResponse
-```
-
-## Fluxo de histórico
-
-```text
-GET /api/sessions/{id}/messages
-        ↓
-SessionController
-        ↓
-SessionService
-        ↓
-Verificação da sessão
-        ↓
-MessageRepository
-        ↓
-Ordenação por timestamp
-        ↓
-Lista de MessageResponse
-```
-
-## Comunicação com o front-end
-
-O front-end consumirá a API pela URL:
-
-```text
-http://localhost:8080
-```
-
-Principais respostas HTTP utilizadas:
-
-```text
-200 OK
-201 Created
-400 Bad Request
-404 Not Found
-```
-
-## CORS
-
-A aplicação possui configuração para permitir requisições do front-end durante o desenvolvimento.
-
-Os cabeçalhos relacionados ao CORS podem aparecer nas respostas:
-
-```text
-Vary: Origin
-Vary: Access-Control-Request-Method
-Vary: Access-Control-Request-Headers
-```
-
-## Upload de arquivos
-
-O tamanho máximo está configurado no `application.yml`:
-
-```yaml
-spring:
-  servlet:
-    multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
-```
-
-Essa configuração impede o recebimento de arquivos maiores que o limite definido.
-
-## Decisões arquiteturais
-
-As principais decisões da primeira etapa foram:
-
-* Separar front-end e back-end em repositórios diferentes.
-* Utilizar Java 17.
-* Utilizar Spring Boot.
-* Organizar o projeto em camadas.
-* Utilizar DTOs para entrada e saída.
-* Centralizar regras no service.
-* Utilizar repositórios JPA.
-* Persistir dados inicialmente no H2.
-* Padronizar erros com `ProblemDetail`.
-* Utilizar Maven Wrapper.
-* Desenvolver funcionalidades em branches separadas.
-
-## Evolução futura
-
-A arquitetura permite substituir ou adicionar componentes sem alterar toda a aplicação.
-
-Evoluções possíveis:
-
-* PostgreSQL no lugar do H2.
-* Autenticação com Spring Security.
-* Integração com API de inteligência artificial.
-* Armazenamento de arquivos em serviço externo.
-* Documentação com Swagger.
-* Testes unitários e de integração.
-* Docker.
-* Deploy em ambiente de nuvem.
+- Implementação concreta `MockAiResponseGenerator` para primeira etapa — retorna respostas pré-definidas baseadas em palavras-chave.
+- Futura implementação `OpenAiResponseGenerator` ou `ClaudeResponseGenerator` injetada via Spring `@Profile` ou `@ConditionalOnProperty`.
+- A troca entre mock e IA real ocorre por configuração (`application.yml`), sem alterar ChatService ou camadas superiores.
+- Preparar `MessageDTO` para suportar futuro streaming com WebSocket ou SSE.
+
+## Decisões aprovadas pela equipe
+
+- Stack: Java 17, Spring Boot 3 e Maven no back-end.
+- Stack front-end: React, TypeScript, Vite e Axios.
+- Persistência: H2 em modo arquivo na primeira etapa (`jdbc:h2:file:./data/mindjournal`), garantindo dados após reinício.
+- PostgreSQL: Reservado como possibilidade futura, não implementado agora.
+- JPA: `ddl-auto: update` gera o schema automaticamente; `schema.sql` não será utilizado.
+- Upload: `sessionId` é obrigatório. O multipart contém os campos `file` e `sessionId`.
+- Validação de sessão: ocorre nos Services (via SessionService), nunca nos Controllers.
+- Validação de arquivo: tipo, extensão e tamanho validados no AttachmentService.
+- Controllers: apenas recebem, convertem e delegam — sem regras de negócio.
+- Contrato `POST /api/chat`: retorna `userMessage` e `assistantMessage`, ambos MessageDTO.
+- Datas: ISO 8601 UTC (`Instant`) em todas as respostas e entidades.
+- Ordenação de sessões: por `updatedAt` decrescente.
+- Ordenação de mensagens: por `timestamp` crescente.
+- Limite de upload: 10 MB, um arquivo por requisição.
+- Upload no front-end: permitido apenas quando há uma sessão ativa.
+- UploadZone: recebe o arquivo e renderiza estados; validação e HTTP no useUpload.
+- Componente App: apenas compõe a interface e consome Custom Hooks — sem estado próprio.
+- Erros padronizados: `ProblemDetail` (RFC 9457) com campos `status`, `title` e `detail`.
+- AttachmentController: recebe `MultipartFile` e converte para objeto de entrada independente de HTTP antes de chamar o service.
+- AttachmentService: não recebe `MultipartFile` — recebe nome, tipo MIME, tamanho, conteúdo do arquivo e `sessionId`.
+- `GET /api/sessions/{id}/attachments`: endpoint opcional na Etapa 1, não bloqueia requisitos mínimos.
+- Title ausente ou vazio no `CreateSessionRequest`: SessionService define como `"Nova sessão"`. `SessionDTO` sempre retorna `title` não nulo.
+- Novas mensagens e novos anexos atualizam `updatedAt` da sessão via `SessionService.touchSession()`.
+- Sender padronizado como `USER` ou `ASSISTANT` (maiúsculo) em toda a aplicação.
+- Erros de hooks no front-end tipados como `ProblemDetail | null` em vez de `string | null`.
+
+## Seção final
+
+### Suposições utilizadas na especificação
+
+- Back-end será executado em `localhost:8080`.
+- H2 em modo arquivo na primeira etapa.
+- Respostas do assistente são geradas por lógica simulada (mock).
+- Sessões não possuem funcionalidade de exclusão ou edição na primeira etapa.
+- Upload salva arquivos no sistema de arquivos local (não em cloud storage).
+- Mensagens são texto sem formatação (sem markdown ou rich text).
+- Um arquivo por requisição de upload.
+
+### Decisões que precisam de validação da equipe
+
+As decisões abaixo foram aprovadas e registradas na seção "Decisões aprovadas pela equipe" acima.
+
+### Riscos arquiteturais identificados
+
+- Resposta simulada pode criar expectativa equivocada no front-end sobre latência e formato da resposta real com IA.
+- Upload síncrono pode travar a thread em arquivos grandes — necessário considerar `CompletableFuture` ou thread pool se o limite aumentar.
+- Persistência de arquivos no sistema local impede escalabilidade horizontal — será necessário cloud storage no futuro.
+- Ausência de paginação no histórico pode ser problema com muitas mensagens.
+
+### Funcionalidades consideradas fora do escopo da primeira etapa
+
+- Autenticação e autorização de usuários.
+- Deploy e infraestrutura (Docker, CI/CD).
+- Integração real com API de IA (OpenAI, Claude, etc.).
+- Edição e exclusão de mensagens.
+- WebSocket ou SSE para streaming de respostas.
+- Testes automatizados (serão especificados na segunda etapa).
+- Upload para cloud storage (S3, etc.).
+- Busca textual no histórico.
+- Notificações push.
+- Migração para PostgreSQL.
