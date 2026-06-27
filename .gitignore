@@ -7,3 +7,7 @@ uploads/
 .classpath
 .project
 .settings/
+
+.env
+.env.local
+docker-data/
