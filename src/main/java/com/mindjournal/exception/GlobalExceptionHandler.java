@@ -2,6 +2,7 @@ package com.mindjournal.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -47,5 +48,19 @@ public class GlobalExceptionHandler {
         problem.setProperty("timestamp", Instant.now());
 
         return problem;
+    }
+
+    @ExceptionHandler(InvalidFileException.class)
+    public ResponseEntity<ProblemDetail> handleInvalidFile(InvalidFileException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problemDetail.setTitle("Arquivo Inválido");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problemDetail);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ProblemDetail> handleMaxSizeException(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "O arquivo enviado é muito grande. O limite máximo é de 10 MB.");
+        problemDetail.setTitle("Tamanho Excedido");
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(problemDetail);
     }
 }
