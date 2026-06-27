@@ -1,0 +1,28 @@
+Implemente o pipeline de ingestão aprovado no System Docs, preservando a arquitetura atual.
+
+CRIAR OU ADAPTAR:
+- Document e DocumentStatus;
+- DocumentChunk;
+- repositories;
+- DocumentParser e implementações para TXT e PDF;
+- TextChunker;
+- EmbeddingService agnóstico;
+- DocumentIngestionService;
+- N8nWebhookClient;
+- DTOs de upload, status e webhook;
+- endpoint GET /api/documents/{id}/status;
+- integração do upload atual com a ingestão.
+
+RESTRIÇÕES:
+- controller apenas valida HTTP e delega;
+- parsing, chunking e embedding em abstrações separadas;
+- status deve seguir RECEIVED, PROCESSING, INDEXED e FAILED;
+- webhook só após persistência concluída;
+- falha de webhook não pode apagar chunks já persistidos;
+- configurações por application.yml e variáveis de ambiente;
+- ProblemDetail com 400, 404, 409 e 500;
+- preserve arquivos existentes sempre que possível;
+- não adicione comentários dentro do código;
+- inclua testes.
+
+Antes de editar, mostre o plano de arquivos. Depois implemente e execute os testes.

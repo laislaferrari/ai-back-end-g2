@@ -1,0 +1,22 @@
+A especificação frontend está aprovada. Implemente suporte às fontes RAG com mudanças mínimas.
+
+TAREFAS:
+- criar o tipo RagSource;
+- atualizar ChatResponse;
+- atualizar Message para associar sources apenas à resposta do assistente;
+- adaptar chatService;
+- adaptar o hook de conversa;
+- criar SourcePanel;
+- atualizar MessageBubble para exibir fontes recolhíveis;
+- tratar sources ausente como array vazio;
+- preservar layout atual;
+- incluir acessibilidade básica;
+- executar npm run build.
+
+RESTRIÇÕES:
+- SourcePanel recebe dados por props;
+- MessageBubble não faz chamadas HTTP;
+- não usar any;
+- não adicionar biblioteca sem necessidade;
+- não adicionar comentários dentro do código;
+- entregar arquivos completos alterados.

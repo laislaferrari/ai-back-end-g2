@@ -1,0 +1,21 @@
+A especificação está aprovada. Implemente somente a infraestrutura PostgreSQL + pgvector no repositório atual.
+
+TAREFAS:
+- substituir o perfil principal H2 por PostgreSQL para a Parte 2;
+- manter um perfil H2 apenas se ele continuar útil para testes;
+- adicionar dependências necessárias no pom.xml;
+- criar docker-compose.yml com PostgreSQL e pgvector;
+- criar .env.example sem segredos;
+- criar migrations versionadas;
+- habilitar CREATE EXTENSION IF NOT EXISTS vector;
+- não criar ainda serviços de RAG;
+- preservar endpoints existentes;
+- atualizar README com comandos PowerShell e Git Bash;
+- executar testes e compilação.
+
+CRITÉRIOS:
+- nenhuma credencial real no Git;
+- aplicação inicia com variáveis de ambiente;
+- schema é reproduzível;
+- health continua respondendo;
+- informe todos os arquivos alterados.

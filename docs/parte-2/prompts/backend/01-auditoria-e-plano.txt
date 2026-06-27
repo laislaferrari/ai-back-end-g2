@@ -1,0 +1,29 @@
+Aja como um Arquiteto de Software Sênior especialista em Java 17, Spring Boot 3, PostgreSQL, pgvector e RAG.
+
+CONTEXTO:
+Você está dentro do repositório ai-back-end-g2 do projeto MindJourney IA. A Parte 1 já possui controllers, DTOs, entidades, repositories, services, tratamento de erros com ProblemDetail, endpoints de health, sessões, mensagens, chat e upload. Preserve tudo que já funciona.
+
+INTENÇÃO:
+Audite integralmente o repositório e crie primeiro docs/parte-2/implementation-plan.md. Não altere código nesta execução.
+
+O documento deve:
+- listar todos os arquivos existentes relevantes;
+- identificar contratos atuais do chat e upload;
+- apontar mudanças mínimas necessárias;
+- definir arquivos novos e arquivos modificados;
+- definir ordem de implementação;
+- mapear riscos de quebra;
+- confirmar como preservar compatibilidade com o frontend atual;
+- propor testes unitários e de integração.
+
+RESTRIÇÕES:
+- não reestruture o projeto inteiro;
+- não renomeie classes existentes sem necessidade;
+- não remova endpoints da Parte 1;
+- não introduza lógica de parsing em controller;
+- não coloque acesso direto ao banco no RagService;
+- não hardcode TOP_K, MIN_SIMILARITY, URLs ou chaves;
+- não exponha segredos;
+- não gere código ainda.
+
+Ao final, mostre um resumo dos arquivos que seriam criados ou alterados.

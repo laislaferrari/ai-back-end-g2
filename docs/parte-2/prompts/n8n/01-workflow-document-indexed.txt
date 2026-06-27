@@ -1,0 +1,18 @@
+Crie um workflow n8n exportável em JSON para o MindJourney IA.
+
+FLUXO:
+1. receber POST no webhook /mindjourney/document-indexed;
+2. validar event = DOCUMENT_INDEXED;
+3. consultar GET {{$env.BACKEND_URL}}/api/health;
+4. consultar GET {{$env.BACKEND_URL}}/api/documents/{{$json.documentId}}/status;
+5. continuar somente se status = INDEXED;
+6. montar uma mensagem resumida com filename, chunkCount e indexedAt;
+7. entregar a mensagem em um nó de notificação facilmente substituível;
+8. registrar caminho de erro.
+
+RESTRIÇÕES:
+- não conter regra de negócio do domínio;
+- URLs em variáveis de ambiente;
+- nenhum segredo no JSON;
+- nós nomeados em português;
+- incluir instruções de importação e teste.

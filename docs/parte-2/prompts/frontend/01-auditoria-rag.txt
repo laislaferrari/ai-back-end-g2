@@ -1,0 +1,24 @@
+Aja como um Engenheiro Frontend Sênior especialista em React 18, TypeScript e integração de APIs.
+
+CONTEXTO:
+Você está no repositório ai-front-end-g2. O projeto já possui chat, histórico, upload, services, hooks, types e componentes. Preserve o layout e tudo que funciona.
+
+INTENÇÃO:
+Audite o código e escreva docs/parte-2/frontend-rag-plan.md antes de alterar qualquer arquivo.
+
+MAPEAR:
+- contrato atual de ChatResponse;
+- fluxo do envio da mensagem;
+- hook que controla conversa;
+- componentes Message e MessageBubble;
+- upload e estados existentes;
+- mudanças mínimas para suportar sources;
+- novos componentes SourcePanel e fontes colapsáveis;
+- loading, sem fontes e erro.
+
+RESTRIÇÕES:
+- não refatore o app inteiro;
+- não duplique serviços;
+- não faça componentes buscarem dados diretamente;
+- preserve a estrutura atual;
+- não gere código nesta primeira execução.

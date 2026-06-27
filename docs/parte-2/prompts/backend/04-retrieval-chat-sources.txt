@@ -1,0 +1,21 @@
+Implemente a fase de retrieval e integre ao chat existente.
+
+TAREFAS:
+- criar RagService como orquestrador puro;
+- gerar embedding da pergunta via EmbeddingService;
+- consultar DocumentChunkRepository por similaridade vetorial;
+- parametrizar topK e minSimilarity;
+- criar RagSource e RagContext;
+- enriquecer o prompt do gerador de resposta;
+- atualizar ChatResponse para retornar sources;
+- manter resposta válida com sources vazio;
+- preservar persistência de mensagens e sessões;
+- incluir testes sem depender de API real de embedding.
+
+RESTRIÇÕES:
+- RagService não acessa EntityManager, JdbcTemplate ou banco diretamente;
+- RagService não conhece detalhes HTTP;
+- não hardcode parâmetros;
+- não quebrar o formato anterior além da adição compatível de sources;
+- não adicionar comentários dentro do código;
+- executar todos os testes.
