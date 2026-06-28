@@ -819,7 +819,7 @@ rag:
     top-k: ${RAG_TOP_K:5}                          # EXEMPLO -- decisao pendente
     min-similarity: ${RAG_MIN_SIMILARITY:0.75}     # EXEMPLO -- decisao pendente
   embedding:
-    dimension: ${RAG_EMBEDDING_DIMENSION:768}      # EXEMPLO -- decisao pendente
+    dimension: ${RAG_EMBEDDING_DIMENSION:768}      # Decidido: embeddinggemma:300m -> 768. Ver docs/parte-2/embedding-decision.md
   webhook:
     url: ${N8N_WEBHOOK_URL:}
     timeout: ${N8N_WEBHOOK_TIMEOUT:5000}           # EXEMPLO -- decisao pendente
@@ -880,13 +880,19 @@ rag:
 
 ## 16. Decisões pendentes
 
-### Bloqueiam a migration V3
+**Nota (27/06/2026):** As seguintes decisões estavam pendentes e foram **resolvidas**:
+
+- Provedor de embedding: **Ollama local**
+- Modelo: **`embeddinggemma:300m`**
+- Dimensão do vetor: **`768`**
+
+O racional completo está em `docs/parte-2/embedding-decision.md`.
+
+A única decisão que **continua bloqueando** a V3 é:
 
 | Decisão | Impacto |
 |---|---|
-| **Provedor e modelo de embedding** | Define qual serviço externo será chamado e a dimensão do vetor |
-| **Dimensão do vetor (D)** | Impacta `vector(D)` na DDL e a configuração `rag.embedding.dimension` |
-| **Representação Java do vetor + integração Hibernate/pgvector** | Necessário verificar se `float[]` com `columnDefinition = "vector(D)"` funciona no Hibernate 6 / Spring Boot 3.4, ou se exige tipo customizado (ex.: `PGvector` do driver pgvector-jdbc) |
+| **Representação Java do vetor + integração Hibernate/pgvector** | Necessário verificar se `float[]` com `columnDefinition = "vector(768)"` funciona no Hibernate 6 / Spring Boot 3.4, ou se exige tipo customizado (ex.: `PGvector` do driver pgvector-jdbc) |
 
 **Nota:** A relação Document -> Attachment (obrigatória e exclusiva) está **definitivamente aprovada** nesta especificação e não bloqueia a V3.
 
