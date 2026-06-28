@@ -152,7 +152,7 @@ Transições válidas:
 | `document` | `Document` | `BIGINT` (FK) | NOT NULL | FK -> `documents(id)` ON DELETE CASCADE |
 | `content` | `String` | `TEXT` | NOT NULL | Texto do fragmento |
 | `chunkIndex` | `Integer` | `INTEGER` | NOT NULL | Ordem sequencial, iniciando em 0 |
-| `embedding` | a decidir | `vector(D)` | NOT NULL | Dimensão D depende do modelo |
+| `embedding` | `float[]` | `vector(768)` | NOT NULL | `@JdbcTypeCode(SqlTypes.VECTOR)` e `@Array(length = 768)` |
 | `createdAt` | `Instant` | `TIMESTAMP WITH TIME ZONE` | NOT NULL | `@PrePersist` |
 
 **Regras:**
@@ -189,7 +189,7 @@ document_chunks (NOVO)
   - document_id (FK)
   - chunk_index (UK com document_id)
   - content (TEXT)
-  - embedding (vector(D))
+  - embedding (vector(768))
   - created_at
 ```
 
@@ -776,7 +776,7 @@ O `ChatResponse` existente (Parte 1) recebe uma evolução aditiva e retrocompat
 | `document_id` | `BIGINT` | NOT NULL, FK -> `documents(id)` ON DELETE CASCADE |
 | `content` | `TEXT` | NOT NULL |
 | `chunk_index` | `INTEGER` | NOT NULL |
-| `embedding` | `vector(D)` | NOT NULL (Dimensão D: **decisão pendente**) |
+| `embedding` | `vector(768)` | NOT NULL |
 | `created_at` | `TIMESTAMP WITH TIME ZONE` | NOT NULL |
 
 ### Constraints adicionais
@@ -825,7 +825,7 @@ rag:
     timeout: ${N8N_WEBHOOK_TIMEOUT:5000}           # EXEMPLO -- decisao pendente
 ```
 
-**Validação em startup:** Um componente com `@PostConstruct` valida que `rag.embedding.dimension` é positivo e, se possível, compatível com a coluna `vector(D)` já existente no banco.
+**Validação em startup:** Um componente com `@PostConstruct` valida que `rag.embedding.dimension` é exatamente `768`, compatível com a coluna `vector(768)` definida na migration.
 
 ---
 
@@ -878,7 +878,7 @@ rag:
 
 ---
 
-## 16. Decisões pendentes
+## 16. Decisões resolvidas e pendências não bloqueantes
 
 **Nota (27/06/2026):** As seguintes decisões estavam pendentes e foram **resolvidas**:
 
@@ -888,13 +888,17 @@ rag:
 
 O racional completo está em `docs/parte-2/embedding-decision.md`.
 
-A única decisão que **continua bloqueando** a V3 é:
+Também foram validados pelo spike técnico:
 
-| Decisão | Impacto |
-|---|---|
-| **Representação Java do vetor + integração Hibernate/pgvector** | Necessário verificar se `float[]` com `columnDefinition = "vector(768)"` funciona no Hibernate 6 / Spring Boot 3.4, ou se exige tipo customizado (ex.: `PGvector` do driver pgvector-jdbc) |
+- Representação Java: **`float[]`**
+- Integração Hibernate: **`org.hibernate.orm:hibernate-vector:6.6.11.Final`**
+- Mapeamento JPA: **`@JdbcTypeCode(SqlTypes.VECTOR)`** com **`@Array(length = 768)`**
+- PostgreSQL 17 com pgvector: persistência, leitura, atualização e consultas de similaridade funcionando
+- H2: incompatível com `SqlTypes.VECTOR`; os testes RAG de repository devem usar Testcontainers com pgvector
 
-**Nota:** A relação Document -> Attachment (obrigatória e exclusiva) está **definitivamente aprovada** nesta especificação e não bloqueia a V3.
+Foram executados 8 testes de integração sem falhas, incluindo rejeição de vetores com dimensão diferente de 768, consulta HQL com `cosine_distance` e consulta nativa com `<=>`.
+
+**Nota:** A relação Document -> Attachment, obrigatória e exclusiva, está definitivamente aprovada e não bloqueia a V3.
 
 ### Não bloqueiam a V3, mas precisam de decisão
 
