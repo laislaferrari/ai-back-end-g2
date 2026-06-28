@@ -82,4 +82,13 @@ public class RagIngestionProperties {
             this.dimension = dimension;
         }
     }
+
+    private String ollamaUrl = "http://localhost:11434/api/embed";
+    private String ollamaModel = "embeddinggemma:300m";
+
+    public String getOllamaUrl() { return ollamaUrl; }
+    public void setOllamaUrl(String ollamaUrl) { this.ollamaUrl = ollamaUrl; }
+
+    public String getOllamaModel() { return ollamaModel; }
+    public void setOllamaModel(String ollamaModel) { this.ollamaModel = ollamaModel; }
 }

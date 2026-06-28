@@ -19,7 +19,8 @@ public class ChatService {
     private final AiResponseGenerator aiResponseGenerator;
 
     // Construtor manual no lugar do Lombok
-    public ChatService(SessionRepository sessionRepository, MessageService messageService, AiResponseGenerator aiResponseGenerator) {
+    public ChatService(SessionRepository sessionRepository, MessageService messageService,
+            AiResponseGenerator aiResponseGenerator) {
         this.sessionRepository = sessionRepository;
         this.messageService = messageService;
         this.aiResponseGenerator = aiResponseGenerator;
@@ -32,22 +33,20 @@ public class ChatService {
                 .orElseThrow(() -> new SessionNotFoundException(request.sessionId()));
 
         MessageResponse userMsg = messageService.createAndSaveMessage(
-                session, 
-                MessageRole.USER, 
-                request.content()
-        );
+                session,
+                MessageRole.USER,
+                request.content());
 
         String aiContent = aiResponseGenerator.generateResponse(session.getId(), request.content());
 
         MessageResponse assistantMsg = messageService.createAndSaveMessage(
-                session, 
-                MessageRole.ASSISTANT, 
-                aiContent
-        );
+                session,
+                MessageRole.ASSISTANT,
+                aiContent);
 
         session.setUpdatedAt(Instant.now());
         sessionRepository.save(session);
 
-        return new ChatResponse(userMsg, assistantMsg);
+        return new ChatResponse(userMsg, assistantMsg, java.util.Collections.emptyList());
     }
 }

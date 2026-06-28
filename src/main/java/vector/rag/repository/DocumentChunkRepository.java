@@ -10,4 +10,14 @@ public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, Lo
     List<DocumentChunk> findByDocumentIdOrderByChunkIndexAsc(Long documentId);
 
     void deleteByDocumentId(Long documentId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT c FROM DocumentChunk c " +
+           "WHERE 1 - (c.embedding <=> :embedding) >= :minSimilarity " +
+           "ORDER BY c.embedding <=> :embedding " +
+           "LIMIT :limit")
+    java.util.List<vector.rag.entity.DocumentChunk> findTopRelevantChunks(
+        @org.springframework.data.repository.query.Param("embedding") float[] embedding, 
+        @org.springframework.data.repository.query.Param("minSimilarity") float minSimilarity, 
+        @org.springframework.data.repository.query.Param("limit") int limit
+    );
 }
