@@ -20,3 +20,10 @@ spring:
   h2:
     console:
       enabled: false
+
+rag:
+  chunk:
+    max-size: ${RAG_CHUNK_MAX_SIZE:1000}
+    overlap: ${RAG_CHUNK_OVERLAP:200}
+  embedding:
+    dimension: ${RAG_EMBEDDING_DIMENSION:768}
