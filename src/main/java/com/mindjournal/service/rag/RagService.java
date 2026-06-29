@@ -4,6 +4,7 @@ import com.mindjournal.dto.SourceDTO;
 import vector.rag.entity.DocumentChunk;
 import vector.rag.repository.DocumentChunkRepository;
 import com.mindjournal.service.embedding.OllamaEmbeddingService;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,7 +24,7 @@ public class RagService {
     public RagContext retrieveContext(String userQuery) {
         float[] vector = embeddingService.generateEmbedding(userQuery);
         
-        List<DocumentChunk> chunks = chunkRepository.findTopRelevantChunks(vector, 0.0f, 3);
+        List<DocumentChunk> chunks = chunkRepository.findTopRelevantChunks(vector, 0.0f, PageRequest.of(0, 3));
 
         List<SourceDTO> sources = chunks.stream().map(chunk ->
             new SourceDTO(
