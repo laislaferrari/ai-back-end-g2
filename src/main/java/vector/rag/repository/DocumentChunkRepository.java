@@ -22,4 +22,14 @@ public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, Lo
         @Param("minSimilarity") float minSimilarity,
         Pageable pageable
     );
+
+    @Query("SELECT c, 1 - cosine_distance(c.embedding, :embedding) AS similarityScore " +
+           "FROM DocumentChunk c " +
+           "WHERE 1 - cosine_distance(c.embedding, :embedding) >= :minSimilarity " +
+           "ORDER BY similarityScore DESC")
+    List<Object[]> findRelevantChunksWithScore(
+        @Param("embedding") float[] embedding,
+        @Param("minSimilarity") float minSimilarity,
+        Pageable pageable
+    );
 }

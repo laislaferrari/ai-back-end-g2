@@ -48,6 +48,16 @@ public class RagIngestionProperties {
                 "rag.embedding.dimension deve ser 768, mas foi " + embedding.dimension
             );
         }
+        if (retrieval.topK <= 0) {
+            throw new IllegalStateException(
+                "rag.retrieval.top-k deve ser maior que zero, mas foi " + retrieval.topK
+            );
+        }
+        if (retrieval.minSimilarity < 0.0 || retrieval.minSimilarity > 1.0) {
+            throw new IllegalStateException(
+                "rag.retrieval.min-similarity deve estar entre 0.0 e 1.0, mas foi " + retrieval.minSimilarity
+            );
+        }
     }
 
     public static class Chunk {
@@ -81,6 +91,37 @@ public class RagIngestionProperties {
         public void setDimension(int dimension) {
             this.dimension = dimension;
         }
+    }
+
+    public static class Retrieval {
+        private int topK = 3;
+        private double minSimilarity = 0.70;
+
+        public int getTopK() {
+            return topK;
+        }
+
+        public void setTopK(int topK) {
+            this.topK = topK;
+        }
+
+        public double getMinSimilarity() {
+            return minSimilarity;
+        }
+
+        public void setMinSimilarity(double minSimilarity) {
+            this.minSimilarity = minSimilarity;
+        }
+    }
+
+    private Retrieval retrieval = new Retrieval();
+
+    public Retrieval getRetrieval() {
+        return retrieval;
+    }
+
+    public void setRetrieval(Retrieval retrieval) {
+        this.retrieval = retrieval;
     }
 
     private String ollamaUrl = "http://localhost:11434/api/embed";
