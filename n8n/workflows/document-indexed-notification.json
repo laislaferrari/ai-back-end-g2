@@ -1,0 +1,181 @@
+{
+  "name": "Document Indexed Notification",
+  "nodes": [
+    {
+      "id": "webhook-receive",
+      "name": "Webhook - Receber Notificação",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "document-indexed",
+      "parameters": {
+        "path": "document-indexed",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      }
+    },
+    {
+      "id": "health-check",
+      "name": "GET - Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL }}/api/health",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "check-status",
+      "name": "GET - Status do Documento",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL }}/api/documents/{{ $json.documentId }}/status",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "check-status-switch",
+      "name": "IF - Status Indexado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equal",
+              "value2": "INDEXED"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "success-notify",
+      "name": "Notificação de Sucesso",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1050, 200],
+      "parameters": {}
+    },
+    {
+      "id": "error-notify",
+      "name": "Notificação de Falha",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1050, 400],
+      "parameters": {}
+    },
+    {
+      "id": "webhook-response",
+      "name": "Resposta do Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Receber Notificação": {
+      "main": [
+        [
+          {
+            "node": "GET - Health Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - Health Check": {
+      "main": [
+        [
+          {
+            "node": "GET - Status do Documento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - Status do Documento": {
+      "main": [
+        [
+          {
+            "node": "IF - Status Indexado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Status Indexado?": {
+      "main": [
+        [
+          {
+            "node": "Notificação de Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notificação de Falha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notificação de Sucesso": {
+      "main": [
+        [
+          {
+            "node": "Resposta do Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notificação de Falha": {
+      "main": [
+        [
+          {
+            "node": "Resposta do Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "America/Sao_Paulo",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "mindjourney"
+    },
+    {
+      "name": "rag"
+    }
+  ]
+}
