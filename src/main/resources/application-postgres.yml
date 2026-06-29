@@ -29,6 +29,9 @@ rag:
     dimension: ${RAG_EMBEDDING_DIMENSION:768}
   ollama-url: ${OLLAMA_URL:http://localhost:11434/api/embed}
   ollama-model: ${OLLAMA_MODEL:embeddinggemma:300m}
+  retrieval:
+    top-k: ${RAG_TOP_K:3}
+    min-similarity: ${RAG_MIN_SIMILARITY:0.70}
 
 n8n:
   webhook:
