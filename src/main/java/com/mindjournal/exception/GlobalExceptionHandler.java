@@ -93,4 +93,17 @@ public class GlobalExceptionHandler {
         problemDetail.setTitle("Tamanho Excedido");
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(problemDetail);
     }
+
+    @ExceptionHandler(GenerationException.class)
+    public ProblemDetail handleGeneration(GenerationException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.BAD_GATEWAY,
+            "O servi\u00e7o de intelig\u00eancia artificial temporariamente indispon\u00edvel. Tente novamente mais tarde."
+        );
+
+        problem.setTitle("Falha na gera\u00e7\u00e3o de resposta");
+        problem.setProperty("timestamp", java.time.Instant.now());
+
+        return problem;
+    }
 }

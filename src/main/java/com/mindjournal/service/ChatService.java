@@ -47,14 +47,17 @@ public class ChatService {
 
         RagService ragService = ragServiceProvider.getIfAvailable();
         List<SourceDTO> sources;
+        String context;
         if (ragService != null) {
             RagContext ragContext = ragService.retrieveContext(session.getId(), request.content());
             sources = ragContext.sources();
+            context = ragContext.context();
         } else {
             sources = Collections.emptyList();
+            context = "";
         }
 
-        String aiContent = aiResponseGenerator.generateResponse(session.getId(), request.content());
+        String aiContent = aiResponseGenerator.generateResponse(session.getId(), request.content(), context);
 
         MessageResponse assistantMsg = messageService.createAndSaveMessage(
                 session,

@@ -6,7 +6,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableConfigurationProperties({
     RagIngestionProperties.class,
-    RagRetrievalProperties.class
+    RagRetrievalProperties.class,
+    OllamaGenerationProperties.class
 })
 public class RagIngestionConfig {
 }

@@ -32,6 +32,10 @@ rag:
   retrieval:
     top-k: ${RAG_TOP_K:3}
     min-similarity: ${RAG_MIN_SIMILARITY:0.70}
+  generation:
+    ollama-url: ${OLLAMA_CHAT_URL:http://localhost:11434/api/chat}
+    model: ${OLLAMA_CHAT_MODEL:llama3.2:3b}
+    temperature: ${OLLAMA_CHAT_TEMPERATURE:0.2}
 
 n8n:
   webhook:
