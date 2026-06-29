@@ -17,7 +17,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 import vector.rag.entity.DocumentChunk;
-import vector.rag.repository.DocumentChunkRepository;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,6 +24,11 @@ import java.util.Collections;
 import java.util.List;
 
 import org.springframework.test.util.ReflectionTestUtils;
+
+import vector.rag.repository.DocumentChunkRepository;
+import vector.rag.repository.RelevantChunkProjection;
+
+import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
 class RagServiceTest {

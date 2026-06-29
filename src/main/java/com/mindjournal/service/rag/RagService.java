@@ -1,6 +1,7 @@
 package com.mindjournal.service.rag;
 
 import com.mindjournal.config.RagIngestionProperties;
+import com.mindjournal.config.RagRetrievalProperties;
 import com.mindjournal.dto.SourceDTO;
 import com.mindjournal.service.embedding.EmbeddingService;
 import org.springframework.context.annotation.Profile;
@@ -9,10 +10,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vector.rag.entity.DocumentChunk;
 import vector.rag.repository.DocumentChunkRepository;
+import vector.rag.repository.RelevantChunkProjection;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Profile("postgres")
@@ -61,10 +62,8 @@ public class RagService {
 
         String combinedContent = sources.stream()
                 .map(SourceDTO::content)
-                .collect(Collectors.joining("\n\n"));
+                .collect(java.util.stream.Collectors.joining("\n\n"));
 
         return new RagContext(combinedContent, sources);
     }
-
-    public record RagContext(String content, List<SourceDTO> sources) {}
 }
