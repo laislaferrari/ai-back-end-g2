@@ -1,9 +1,10 @@
 package com.mindjournal.service.rag;
 
 import com.mindjournal.dto.SourceDTO;
+import com.mindjournal.service.embedding.EmbeddingService;
 import vector.rag.entity.DocumentChunk;
 import vector.rag.repository.DocumentChunkRepository;
-import com.mindjournal.service.embedding.OllamaEmbeddingService;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -11,12 +12,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Profile("postgres")
 public class RagService {
 
-    private final OllamaEmbeddingService embeddingService;
+    private final EmbeddingService embeddingService;
     private final DocumentChunkRepository chunkRepository;
 
-    public RagService(OllamaEmbeddingService embeddingService, DocumentChunkRepository chunkRepository) {
+    public RagService(EmbeddingService embeddingService, DocumentChunkRepository chunkRepository) {
         this.embeddingService = embeddingService;
         this.chunkRepository = chunkRepository;
     }

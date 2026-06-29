@@ -9,5 +9,6 @@ public record AttachmentDTO(
         String filename,
         AttachmentType type,
         Long size,
-        Instant uploadDate
+        Instant uploadDate,
+        Long documentId
 ) {}

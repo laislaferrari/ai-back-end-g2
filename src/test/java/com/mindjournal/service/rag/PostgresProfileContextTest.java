@@ -3,6 +3,7 @@ package com.mindjournal.service.rag;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.mindjournal.service.embedding.EmbeddingService;
+import com.mindjournal.service.embedding.OllamaEmbeddingService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -43,7 +44,9 @@ class PostgresProfileContextTest {
     void contextLoadsWithPostgresProfile() {
         assertNotNull(ingestionService,
             "DocumentIngestionService deve estar presente no profile postgres");
-        assertNull(embeddingServiceProvider.getIfAvailable(),
-            "EmbeddingService não deve estar disponível sem o profile test");
+        EmbeddingService embeddingService = embeddingServiceProvider.getIfAvailable();
+        assertNotNull(embeddingService,
+            "OllamaEmbeddingService deve estar disponível no profile postgres");
+        assertInstanceOf(OllamaEmbeddingService.class, embeddingService);
     }
 }

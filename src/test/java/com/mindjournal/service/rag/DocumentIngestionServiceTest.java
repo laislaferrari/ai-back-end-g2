@@ -5,7 +5,9 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.mindjournal.config.RagIngestionProperties;
+import com.mindjournal.entity.Document;
 import com.mindjournal.exception.EmbeddingException;
+import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.service.chunking.TextChunker;
 import com.mindjournal.service.embedding.EmbeddingService;
 import com.mindjournal.service.parsing.DocumentParser;
@@ -21,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
 class DocumentIngestionServiceTest {
@@ -43,6 +46,12 @@ class DocumentIngestionServiceTest {
     @Mock
     private RagIngestionProperties properties;
 
+    @Mock
+    private DocumentRepository documentRepository;
+
+    @Mock
+    private DocumentIndexingNotifier indexingNotifier;
+
     private RagIngestionProperties.Embedding embeddingConfig;
 
     private DocumentIngestionService service;
@@ -58,12 +67,13 @@ class DocumentIngestionServiceTest {
 
         service = new DocumentIngestionService(
             transactionService, documentParser, textChunker,
-            embeddingServiceProvider, properties
+            embeddingServiceProvider, properties,
+            documentRepository, indexingNotifier
         );
     }
 
     @Test
-    @DisplayName("falha em markAsProcessing não chama markAsFailed")
+    @DisplayName("falha em markAsProcessing não chama markAsFailed nem notifier")
     void failureInMarkAsProcessingDoesNotCallMarkAsFailed() {
         when(transactionService.markAsProcessing(DOC_ID))
             .thenThrow(new RuntimeException("falha na transação"));
@@ -71,10 +81,11 @@ class DocumentIngestionServiceTest {
         assertThrows(RuntimeException.class, () -> service.ingest(DOC_ID));
 
         verify(transactionService, never()).markAsFailed(anyLong(), anyString());
+        verify(indexingNotifier, never()).notifyIndexed(any(), anyInt());
     }
 
     @Test
-    @DisplayName("arquivo inexistente após PROCESSING chama markAsFailed")
+    @DisplayName("arquivo inexistente após PROCESSING chama markAsFailed, não chama notifier")
     void missingFileCallsMarkAsFailed() throws Exception {
         IngestionSource source = new IngestionSource(DOC_ID, "/tmp/nao-existe.txt", "text/plain");
         when(transactionService.markAsProcessing(DOC_ID)).thenReturn(source);
@@ -82,10 +93,11 @@ class DocumentIngestionServiceTest {
         assertThrows(Exception.class, () -> service.ingest(DOC_ID));
 
         verify(transactionService).markAsFailed(eq(DOC_ID), anyString());
+        verify(indexingNotifier, never()).notifyIndexed(any(), anyInt());
     }
 
     @Test
-    @DisplayName("ausência de EmbeddingService chama markAsFailed")
+    @DisplayName("ausência de EmbeddingService chama markAsFailed, não chama notifier")
     void missingEmbeddingServiceCallsMarkAsFailed() throws Exception {
         Path tempFile = Files.createTempFile("ingestion-test-", ".txt");
         Files.writeString(tempFile, "conteúdo de teste");
@@ -100,10 +112,11 @@ class DocumentIngestionServiceTest {
         assertThrows(EmbeddingException.class, () -> service.ingest(DOC_ID));
 
         verify(transactionService).markAsFailed(eq(DOC_ID), anyString());
+        verify(indexingNotifier, never()).notifyIndexed(any(), anyInt());
     }
 
     @Test
-    @DisplayName("embedding com dimensão inválida chama markAsFailed")
+    @DisplayName("embedding com dimensão inválida chama markAsFailed, não chama notifier")
     void invalidEmbeddingDimensionCallsMarkAsFailed() throws Exception {
         Path tempFile = Files.createTempFile("ingestion-test-", ".txt");
         Files.writeString(tempFile, "conteúdo de teste");
@@ -120,10 +133,11 @@ class DocumentIngestionServiceTest {
         assertThrows(EmbeddingException.class, () -> service.ingest(DOC_ID));
 
         verify(transactionService).markAsFailed(eq(DOC_ID), anyString());
+        verify(indexingNotifier, never()).notifyIndexed(any(), anyInt());
     }
 
     @Test
-    @DisplayName("fluxo feliz cria índices 0..N-1 e chama replaceChunksAndMarkIndexed")
+    @DisplayName("fluxo feliz cria índices 0..N-1, chama replaceChunksAndMarkIndexed e notifier")
     void happyPath() throws Exception {
         Path tempFile = Files.createTempFile("ingestion-test-", ".txt");
         Files.writeString(tempFile, "conteúdo longo para gerar múltiplos chunks");
@@ -142,8 +156,12 @@ class DocumentIngestionServiceTest {
         float[] mockEmbedding = new float[DIM];
         when(embeddingService.generateEmbedding(anyString())).thenReturn(mockEmbedding);
 
+        Document mockDocument = mock(Document.class);
+        when(documentRepository.findByIdWithAttachment(DOC_ID)).thenReturn(Optional.of(mockDocument));
+
         service.ingest(DOC_ID);
 
+        verify(documentRepository).findByIdWithAttachment(DOC_ID);
         verify(transactionService).replaceChunksAndMarkIndexed(eq(DOC_ID), argThat(chunks -> {
             if (chunks.size() != 3) return false;
             assertEquals(0, chunks.get(0).chunkIndex());
@@ -154,11 +172,12 @@ class DocumentIngestionServiceTest {
             assertEquals("chunk C", chunks.get(2).content());
             return true;
         }));
+        verify(indexingNotifier).notifyIndexed(mockDocument, 3);
         verify(transactionService, never()).markAsFailed(anyLong(), anyString());
     }
 
     @Test
-    @DisplayName("TextChunker retorna lista vazia: não chama replace, chama markAsFailed com mensagem de chunking")
+    @DisplayName("TextChunker retorna lista vazia: não chama replace, chama markAsFailed, não chama notifier")
     void emptyChunkListDoesNotCallReplace() throws Exception {
         Path tempFile = Files.createTempFile("ingestion-test-", ".txt");
         Files.writeString(tempFile, "conteúdo");
@@ -173,10 +192,11 @@ class DocumentIngestionServiceTest {
 
         verify(transactionService, never()).replaceChunksAndMarkIndexed(anyLong(), anyList());
         verify(transactionService).markAsFailed(eq(DOC_ID), eq("Falha ao dividir o conteúdo do documento."));
+        verify(indexingNotifier, never()).notifyIndexed(any(), anyInt());
     }
 
     @Test
-    @DisplayName("TextChunker retorna null: não chama replace, chama markAsFailed com mensagem de chunking")
+    @DisplayName("TextChunker retorna null: não chama replace, chama markAsFailed, não chama notifier")
     void nullChunkListDoesNotCallReplace() throws Exception {
         Path tempFile = Files.createTempFile("ingestion-test-", ".txt");
         Files.writeString(tempFile, "conteúdo");
@@ -191,10 +211,11 @@ class DocumentIngestionServiceTest {
 
         verify(transactionService, never()).replaceChunksAndMarkIndexed(anyLong(), anyList());
         verify(transactionService).markAsFailed(eq(DOC_ID), eq("Falha ao dividir o conteúdo do documento."));
+        verify(indexingNotifier, never()).notifyIndexed(any(), anyInt());
     }
 
     @Test
-    @DisplayName("falha de markAsFailed não oculta a exceção original")
+    @DisplayName("falha de markAsFailed não oculta a exceção original, não chama notifier")
     void markAsFailedFailureDoesNotHideOriginal() throws Exception {
         Path tempFile = Files.createTempFile("ingestion-test-", ".txt");
         Files.writeString(tempFile, "conteúdo");
@@ -210,10 +231,11 @@ class DocumentIngestionServiceTest {
             () -> service.ingest(DOC_ID));
 
         assertTrue(originalException.getMessage().contains("erro original"));
+        verify(indexingNotifier, never()).notifyIndexed(any(), anyInt());
     }
 
     @Test
-    @DisplayName("falha de markAsFailed é adicionada como suprimida")
+    @DisplayName("falha de markAsFailed é adicionada como suprimida, não chama notifier")
     void markAsFailedFailureIsSuppressed() throws Exception {
         Path tempFile = Files.createTempFile("ingestion-test-", ".txt");
         Files.writeString(tempFile, "conteúdo");
@@ -233,5 +255,6 @@ class DocumentIngestionServiceTest {
         assertEquals("erro original", thrown.getMessage());
         assertTrue(thrown.getSuppressed().length > 0);
         assertEquals("markAsFailed error", thrown.getSuppressed()[0].getMessage());
+        verify(indexingNotifier, never()).notifyIndexed(any(), anyInt());
     }
 }
