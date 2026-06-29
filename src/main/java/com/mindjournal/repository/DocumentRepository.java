@@ -22,4 +22,7 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT d FROM Document d JOIN FETCH d.attachment WHERE d.id = :id")
     Optional<Document> findByIdWithAttachmentForUpdate(@Param("id") Long id);
+
+    @Query("SELECT d FROM Document d JOIN FETCH d.attachment WHERE d.id = :id")
+    Optional<Document> findByIdWithAttachment(@Param("id") Long id);
 }

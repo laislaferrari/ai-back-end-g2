@@ -1,10 +1,15 @@
 package com.mindjournal.service.rag;
 
 import com.mindjournal.config.RagIngestionProperties;
+import com.mindjournal.entity.Document;
+import com.mindjournal.exception.DocumentNotFoundException;
 import com.mindjournal.exception.EmbeddingException;
+import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.service.chunking.TextChunker;
 import com.mindjournal.service.embedding.EmbeddingService;
 import com.mindjournal.service.parsing.DocumentParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -19,24 +24,32 @@ import java.util.List;
 @Profile("postgres")
 public class DocumentIngestionService {
 
+    private static final Logger log = LoggerFactory.getLogger(DocumentIngestionService.class);
+
     private final IngestionTransactionService transactionService;
     private final DocumentParser documentParser;
     private final TextChunker textChunker;
     private final ObjectProvider<EmbeddingService> embeddingServiceProvider;
     private final RagIngestionProperties properties;
+    private final DocumentRepository documentRepository;
+    private final DocumentIndexingNotifier indexingNotifier;
 
     public DocumentIngestionService(
         IngestionTransactionService transactionService,
         DocumentParser documentParser,
         TextChunker textChunker,
         ObjectProvider<EmbeddingService> embeddingServiceProvider,
-        RagIngestionProperties properties
+        RagIngestionProperties properties,
+        DocumentRepository documentRepository,
+        DocumentIndexingNotifier indexingNotifier
     ) {
         this.transactionService = transactionService;
         this.documentParser = documentParser;
         this.textChunker = textChunker;
         this.embeddingServiceProvider = embeddingServiceProvider;
         this.properties = properties;
+        this.documentRepository = documentRepository;
+        this.indexingNotifier = indexingNotifier;
     }
 
     public void ingest(Long documentId) {
@@ -77,6 +90,8 @@ public class DocumentIngestionService {
 
             stage = "persistencia";
             transactionService.replaceChunksAndMarkIndexed(documentId, preparedChunks);
+
+            notifyIndexed(documentId, preparedChunks.size());
         } catch (Exception e) {
             String safeMessage = switch (stage) {
                 case "leitura" -> "Falha ao ler o arquivo do documento.";
@@ -92,6 +107,16 @@ public class DocumentIngestionService {
                 e.addSuppressed(markFailedException);
             }
             throw (e instanceof RuntimeException re) ? re : new RuntimeException(e);
+        }
+    }
+
+    private void notifyIndexed(Long documentId, int indexedChunks) {
+        try {
+            Document document = documentRepository.findByIdWithAttachment(documentId)
+                    .orElseThrow(() -> new DocumentNotFoundException(documentId));
+            indexingNotifier.notifyIndexed(document, indexedChunks);
+        } catch (Exception e) {
+            log.warn("Falha ao notificar indexação do documento {}: {}", documentId, e.getMessage());
         }
     }
 

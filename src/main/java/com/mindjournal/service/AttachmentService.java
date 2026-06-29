@@ -4,13 +4,17 @@ import com.mindjournal.dto.AttachmentDTO;
 import com.mindjournal.dto.AttachmentInput;
 import com.mindjournal.entity.Attachment;
 import com.mindjournal.entity.AttachmentType;
+import com.mindjournal.entity.Document;
 import com.mindjournal.entity.Session;
 import com.mindjournal.exception.InvalidFileException;
 import com.mindjournal.exception.SessionNotFoundException;
 import com.mindjournal.repository.AttachmentRepository;
+import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.repository.SessionRepository;
+import com.mindjournal.service.rag.DocumentIngestionService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -24,16 +28,27 @@ public class AttachmentService {
 
     private final AttachmentRepository attachmentRepository;
     private final SessionRepository sessionRepository;
+    private final DocumentRepository documentRepository;
+    private final TransactionTemplate transactionTemplate;
+    private final ObjectProvider<DocumentIngestionService> ingestionServiceProvider;
     private final String UPLOAD_DIR = "uploads/";
     private final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
     // Construtor manual (Sem Lombok)
-    public AttachmentService(AttachmentRepository attachmentRepository, SessionRepository sessionRepository) {
+    public AttachmentService(
+        AttachmentRepository attachmentRepository,
+        SessionRepository sessionRepository,
+        DocumentRepository documentRepository,
+        TransactionTemplate transactionTemplate,
+        ObjectProvider<DocumentIngestionService> ingestionServiceProvider
+    ) {
         this.attachmentRepository = attachmentRepository;
         this.sessionRepository = sessionRepository;
+        this.documentRepository = documentRepository;
+        this.transactionTemplate = transactionTemplate;
+        this.ingestionServiceProvider = ingestionServiceProvider;
     }
 
-    @Transactional
     public AttachmentDTO uploadAttachment(AttachmentInput input) {
         // 1. Validar tamanho
         if (input.size() > MAX_FILE_SIZE) {
@@ -50,28 +65,39 @@ public class AttachmentService {
         // 4. Salvar arquivo fisicamente
         String savedPath = saveFileToDisk(input.content(), input.originalFilename());
 
-        // 5. Persistir metadados
-        Attachment attachment = new Attachment();
-        attachment.setSession(session);
-        attachment.setFilename(input.originalFilename());
-        attachment.setType(type);
-        attachment.setSize(input.size());
-        attachment.setFilePath(savedPath);
-        attachment.setUploadDate(Instant.now());
+        // 5. Persistir metadados e criar Document em uma única transação
+        Document document = transactionTemplate.execute(status -> {
+            Attachment attachment = new Attachment();
+            attachment.setSession(session);
+            attachment.setFilename(input.originalFilename());
+            attachment.setType(type);
+            attachment.setSize(input.size());
+            attachment.setFilePath(savedPath);
+            attachment.setUploadDate(Instant.now());
 
-        Attachment savedAttachment = attachmentRepository.save(attachment);
+            Attachment savedAttachment = attachmentRepository.save(attachment);
 
-        // 6. Atualizar a sessão
-        session.setUpdatedAt(Instant.now());
-        sessionRepository.save(session);
+            session.setUpdatedAt(Instant.now());
+            sessionRepository.save(session);
+
+            Document doc = new Document(savedAttachment);
+            return documentRepository.save(doc);
+        });
+
+        // 6. Disparar ingestão (em transação separada, após o commit acima)
+        DocumentIngestionService ingestionService = ingestionServiceProvider.getIfAvailable();
+        if (ingestionService != null) {
+            ingestionService.ingest(document.getId());
+        }
 
         return new AttachmentDTO(
-                savedAttachment.getId(),
+                document.getAttachment().getId(),
                 session.getId(),
-                savedAttachment.getFilename(),
-                savedAttachment.getType(),
-                savedAttachment.getSize(),
-                savedAttachment.getUploadDate()
+                document.getAttachment().getFilename(),
+                type,
+                input.size(),
+                document.getAttachment().getUploadDate(),
+                document.getId()
         );
     }
 

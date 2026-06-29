@@ -1,6 +1,9 @@
 package vector.rag.repository;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import vector.rag.entity.DocumentChunk;
 
 import java.util.List;
@@ -11,13 +14,12 @@ public interface DocumentChunkRepository extends JpaRepository<DocumentChunk, Lo
 
     void deleteByDocumentId(Long documentId);
 
-    @org.springframework.data.jpa.repository.Query("SELECT c FROM DocumentChunk c " +
-           "WHERE 1 - (c.embedding <=> :embedding) >= :minSimilarity " +
-           "ORDER BY c.embedding <=> :embedding " +
-           "LIMIT :limit")
-    java.util.List<vector.rag.entity.DocumentChunk> findTopRelevantChunks(
-        @org.springframework.data.repository.query.Param("embedding") float[] embedding, 
-        @org.springframework.data.repository.query.Param("minSimilarity") float minSimilarity, 
-        @org.springframework.data.repository.query.Param("limit") int limit
+    @Query("SELECT c FROM DocumentChunk c " +
+           "WHERE 1 - cosine_distance(c.embedding, :embedding) >= :minSimilarity " +
+           "ORDER BY cosine_distance(c.embedding, :embedding)")
+    List<DocumentChunk> findTopRelevantChunks(
+        @Param("embedding") float[] embedding,
+        @Param("minSimilarity") float minSimilarity,
+        Pageable pageable
     );
 }

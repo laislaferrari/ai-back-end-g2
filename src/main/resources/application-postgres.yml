@@ -27,3 +27,9 @@ rag:
     overlap: ${RAG_CHUNK_OVERLAP:200}
   embedding:
     dimension: ${RAG_EMBEDDING_DIMENSION:768}
+  ollama-url: ${OLLAMA_URL:http://localhost:11434/api/embed}
+  ollama-model: ${OLLAMA_MODEL:embeddinggemma:300m}
+
+n8n:
+  webhook:
+    document-indexed-url: ${N8N_DOCUMENT_INDEXED_URL:}
