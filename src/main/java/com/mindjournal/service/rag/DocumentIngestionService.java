@@ -4,6 +4,7 @@ import com.mindjournal.config.RagIngestionProperties;
 import com.mindjournal.entity.Document;
 import com.mindjournal.exception.DocumentNotFoundException;
 import com.mindjournal.exception.EmbeddingException;
+import com.mindjournal.exception.EmptyDocumentException;
 import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.service.chunking.TextChunker;
 import com.mindjournal.service.embedding.EmbeddingService;
@@ -65,8 +66,17 @@ public class DocumentIngestionService {
 
             stage = "chunking";
             List<String> chunkTexts = textChunker.chunk(text);
-            if (chunkTexts == null || chunkTexts.isEmpty()) {
-                throw new IllegalArgumentException("Lista de chunks vazia.");
+            if (chunkTexts == null) {
+                throw new IllegalArgumentException("Lista de chunks nula.");
+            }
+            chunkTexts = chunkTexts.stream()
+                .map(c -> c != null ? c.strip() : "")
+                .filter(c -> !c.isEmpty())
+                .toList();
+            if (chunkTexts.isEmpty()) {
+                throw new EmptyDocumentException(
+                    "O documento não produz chunks com conteúdo após a divisão."
+                );
             }
 
             stage = "embedding";

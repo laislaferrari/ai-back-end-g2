@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import com.mindjournal.config.RagIngestionProperties;
 import com.mindjournal.entity.Document;
 import com.mindjournal.exception.EmbeddingException;
+import com.mindjournal.exception.EmptyDocumentException;
 import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.service.chunking.TextChunker;
 import com.mindjournal.service.embedding.EmbeddingService;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -188,7 +190,9 @@ class DocumentIngestionServiceTest {
         when(documentParser.parse(any(), anyString())).thenReturn("texto extraído");
         when(textChunker.chunk(anyString())).thenReturn(List.of());
 
-        assertThrows(Exception.class, () -> service.ingest(DOC_ID));
+        EmptyDocumentException ex = assertThrows(EmptyDocumentException.class,
+            () -> service.ingest(DOC_ID));
+        assertEquals("O documento não produz chunks com conteúdo após a divisão.", ex.getMessage());
 
         verify(transactionService, never()).replaceChunksAndMarkIndexed(anyLong(), anyList());
         verify(transactionService).markAsFailed(eq(DOC_ID), eq("Falha ao dividir o conteúdo do documento."));
@@ -212,6 +216,66 @@ class DocumentIngestionServiceTest {
         verify(transactionService, never()).replaceChunksAndMarkIndexed(anyLong(), anyList());
         verify(transactionService).markAsFailed(eq(DOC_ID), eq("Falha ao dividir o conteúdo do documento."));
         verify(indexingNotifier, never()).notifyIndexed(any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("chunks nulos e em branco são filtrados; somente válidos geram embeddings e persistência com índices sequenciais")
+    void blankChunksAreFilteredOut() throws Exception {
+        Path tempFile = Files.createTempFile("ingestion-test-", ".txt");
+        Files.writeString(tempFile, "conteúdo");
+        tempFile.toFile().deleteOnExit();
+
+        IngestionSource source = new IngestionSource(DOC_ID, tempFile.toString(), "text/plain");
+        when(transactionService.markAsProcessing(DOC_ID)).thenReturn(source);
+        when(documentParser.parse(any(), anyString())).thenReturn("texto extraído");
+        when(textChunker.chunk(anyString())).thenReturn(
+            Arrays.asList("  chunk A  ", null, "   ", "chunk B", "\n\n\n")
+        );
+        when(embeddingServiceProvider.getIfAvailable()).thenReturn(embeddingService);
+
+        float[] mockEmbedding = new float[DIM];
+        when(embeddingService.generateEmbedding(anyString())).thenReturn(mockEmbedding);
+
+        Document mockDocument = mock(Document.class);
+        when(documentRepository.findByIdWithAttachment(DOC_ID)).thenReturn(Optional.of(mockDocument));
+
+        service.ingest(DOC_ID);
+
+        verify(embeddingService, times(2)).generateEmbedding(anyString());
+        verify(transactionService).replaceChunksAndMarkIndexed(eq(DOC_ID), argThat(chunks -> {
+            if (chunks.size() != 2) return false;
+            assertEquals(0, chunks.get(0).chunkIndex());
+            assertEquals(1, chunks.get(1).chunkIndex());
+            assertEquals("chunk A", chunks.get(0).content());
+            assertEquals("chunk B", chunks.get(1).content());
+            return true;
+        }));
+        verify(indexingNotifier).notifyIndexed(mockDocument, 2);
+        verify(transactionService, never()).markAsFailed(anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("todos os chunks em branco: lança EmptyDocumentException, marca FAILED, não persiste")
+    void allBlankChunksThrowsEmptyDocumentException() throws Exception {
+        Path tempFile = Files.createTempFile("ingestion-test-", ".txt");
+        Files.writeString(tempFile, "conteúdo");
+        tempFile.toFile().deleteOnExit();
+
+        IngestionSource source = new IngestionSource(DOC_ID, tempFile.toString(), "text/plain");
+        when(transactionService.markAsProcessing(DOC_ID)).thenReturn(source);
+        when(documentParser.parse(any(), anyString())).thenReturn("texto extraído");
+        when(textChunker.chunk(anyString())).thenReturn(
+            Arrays.asList("   ", null, "\n\n", "  ")
+        );
+
+        EmptyDocumentException ex = assertThrows(EmptyDocumentException.class,
+            () -> service.ingest(DOC_ID));
+        assertEquals("O documento não produz chunks com conteúdo após a divisão.", ex.getMessage());
+
+        verify(transactionService, never()).replaceChunksAndMarkIndexed(anyLong(), anyList());
+        verify(transactionService).markAsFailed(eq(DOC_ID), eq("Falha ao dividir o conteúdo do documento."));
+        verify(indexingNotifier, never()).notifyIndexed(any(), anyInt());
+        verify(embeddingServiceProvider, never()).getIfAvailable();
     }
 
     @Test
