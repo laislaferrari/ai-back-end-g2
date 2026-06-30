@@ -2,53 +2,55 @@
   "name": "Document Indexed Notification",
   "nodes": [
     {
-      "id": "webhook-receive",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "document-indexed",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "16bb4a27-6e51-49f0-bb7a-98c17fa94c51",
       "name": "Webhook - Receber Notificação",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [250, 300],
-      "webhookId": "document-indexed",
-      "parameters": {
-        "path": "document-indexed",
-        "options": {
-          "responseMode": "responseNode"
-        }
-      }
+      "position": [
+        -832,
+        32
+      ],
+      "webhookId": "document-indexed"
     },
     {
-      "id": "health-check",
+      "parameters": {
+        "url": "=http://host.docker.internal:8080/api/health",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "4f2de54a-a203-4a9e-9581-5d04e7c160d0",
       "name": "GET - Health Check",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [450, 300],
+      "position": [
+        -432,
+        32
+      ]
+    },
+    {
       "parameters": {
-        "method": "GET",
-        "url": "={{ $env.BACKEND_URL }}/api/health",
+        "url": "={{ 'http://host.docker.internal:8080/api/documents/' + $('Webhook - Receber Notificação').first().json.body.documentId + '/status' }}",
         "options": {
           "timeout": 10000
         }
-      }
-    },
-    {
-      "id": "check-status",
+      },
+      "id": "69efdbfa-08f0-4ae5-9dfe-a2704ad8024a",
       "name": "GET - Status do Documento",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [650, 300],
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $env.BACKEND_URL }}/api/documents/{{ $json.documentId }}/status",
-        "options": {
-          "timeout": 10000
-        }
-      }
+      "position": [
+        -224,
+        32
+      ]
     },
     {
-      "id": "check-status-switch",
-      "name": "IF - Status Indexado?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [850, 300],
       "parameters": {
         "conditions": {
           "string": [
@@ -57,44 +59,84 @@
               "operation": "equal",
               "value2": "INDEXED"
             }
-          ]
-        }
-      }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "cb890bc4-8f93-48bb-8ca5-7e0c2a1ce95d",
+      "name": "IF - Status Indexado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        32
+      ]
     },
     {
-      "id": "success-notify",
+      "parameters": {},
+      "id": "a27eb61a-74ae-459c-8966-a7239998194b",
       "name": "Notificação de Sucesso",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1050, 200],
-      "parameters": {}
+      "position": [
+        176,
+        -80
+      ]
     },
     {
-      "id": "error-notify",
+      "parameters": {},
+      "id": "44c4d2f0-8fde-47bb-a6bb-33ac4f0e9175",
       "name": "Notificação de Falha",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1050, 400],
-      "parameters": {}
+      "position": [
+        176,
+        128
+      ]
     },
     {
-      "id": "webhook-response",
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "ae845672-7e3e-4973-8187-4c7fe11c9998",
       "name": "Resposta do Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1050, 300],
+      "position": [
+        176,
+        32
+      ]
+    },
+    {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ $json }}"
-      }
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -624,
+        32
+      ],
+      "id": "7d17a30a-2789-462b-8013-bb571cdfecaf",
+      "name": "Edit Fields"
     }
   ],
+  "pinData": {},
   "connections": {
     "Webhook - Receber Notificação": {
       "main": [
         [
           {
-            "node": "GET - Health Check",
+            "node": "Edit Fields",
             "type": "main",
             "index": 0
           }
@@ -162,20 +204,43 @@
           }
         ]
       ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "GET - Health Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
+  "active": true,
   "settings": {
-    "timezone": "America/Sao_Paulo",
-    "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner"
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
   },
-  "staticData": null,
+  "versionId": "9573eeb9-055c-4009-aa0f-e0b7e1acbb7c",
+  "meta": {
+    "instanceId": "f2d7134edf58ea1febe506b5d7b8db338caf18cc73d653c23060327df8ff63a2"
+  },
+  "nodeGroups": [],
+  "id": "XCMzxzYbBnFcKlE5",
   "tags": [
     {
-      "name": "mindjourney"
+      "updatedAt": "2026-06-30T01:41:23.279Z",
+      "createdAt": "2026-06-30T01:41:23.279Z",
+      "id": "f3ZDXFaFt2ijdHjD",
+      "name": "rag"
     },
     {
-      "name": "rag"
+      "updatedAt": "2026-06-30T01:41:23.250Z",
+      "createdAt": "2026-06-30T01:41:23.250Z",
+      "id": "kbUb2El0RTTXA1CM",
+      "name": "mindjourney"
     }
   ]
 }
