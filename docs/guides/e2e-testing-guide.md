@@ -6,23 +6,18 @@ Validar o pipeline RAG completo do MindJourney IA, desde o health check até a r
 
 ## Pré-requisitos
 
-Antes de executar o teste, verifique:
+Verifique antes de executar:
 
-- Backend rodando com o perfil `postgres`
+- Backend rodando com o perfil `postgres` (veja [../../README.md](../../README.md))
 - PostgreSQL acessível (Docker Compose)
-- Ollama rodando com os modelos `embeddinggemma:300m` e `llama3.2:3b` baixados
+- Ollama rodando com os modelos baixados (veja [ollama-setup.md](ollama-setup.md))
 - PowerShell 5.1 ou superior (Windows) ou PowerShell 7 (macOS, Linux)
 
-O n8n é opcional e não é necessário para o teste E2E.
+O n8n é opcional (veja [n8n-setup.md](n8n-setup.md)).
 
 ## Ordem de inicialização
 
-Os serviços devem ser iniciados na seguinte ordem:
-
-1. **PostgreSQL/pgvector:** `docker compose up -d`
-2. **Ollama:** inicie o Ollama e baixe os modelos (`ollama pull embeddinggemma:300m` e `ollama pull llama3.2:3b`)
-3. **n8n** (opcional): inicie e publique o workflow de notificação
-4. **Backend:** execute com o perfil `postgres`
+Siga a sequência descrita em [../../README.md#ordem-de-inicialização](../../README.md#ordem-de-inicialização) antes de executar o teste.
 
 ## Executar o teste
 
@@ -190,23 +185,7 @@ O passo 7 exibe o diagnóstico completo das fontes:
 
 ## Problemas comuns
 
-### Profile postgres não ativo
-
-A aplicação inicia com o perfil H2 (default) e o pipeline RAG não executa. O chat retorna respostas mock e o status do documento nunca chega a `INDEXED`.
-
-Verifique se `SPRING_PROFILES_ACTIVE=postgres` foi carregado no terminal antes de iniciar o backend.
-
-### PostgreSQL indisponível
-
-Erro de conexão ao iniciar o backend ou timeout no health check.
-
-Execute `docker compose ps` para verificar se o container PostgreSQL está rodando na porta 5433.
-
-### Ollama não está rodando
-
-O polling do documento fica preso em `RECEIVED` ou `PROCESSING` e nunca atinge `INDEXED`, ou o health check do Ollama falha com `Connection refused`.
-
-Consulte o guia `docs/guides/ollama-setup.md` para verificar e iniciar o Ollama.
+Problemas genéricos de configuração (perfil postgres, PostgreSQL, Ollama) são tratados em [../../README.md#troubleshooting](../../README.md#troubleshooting) e em [ollama-setup.md](ollama-setup.md).
 
 ### Upload falha (formato ou tamanho)
 
@@ -222,9 +201,9 @@ O documento permanece em `RECEIVED` ou `PROCESSING` por mais de 60 segundos.
 
 Causas possíveis:
 
-- Ollama não está acessível (embedding não é gerado).
+- Ollama não está acessível (veja [ollama-setup.md](ollama-setup.md)).
 - Erro no parsing ou chunking (verifique os logs do backend).
-- Dimensão do embedding incompatível (veja `docs/guides/ollama-setup.md`).
+- Dimensão do embedding incompatível (veja [ollama-setup.md](ollama-setup.md)).
 
 ### Resposta não contém "violeta"
 
@@ -248,27 +227,9 @@ Causas possíveis:
 
 ## Encerrar os serviços após o teste
 
-### Parar o backend
+Consulte as instruções de encerramento em:
 
-Pressione `Ctrl+C` no terminal onde o backend está rodando.
-
-### Parar o PostgreSQL
-
-```powershell
-docker compose down
-```
-
-Para remover também os dados do banco:
-
-```powershell
-docker compose down -v
-```
-
-### Parar o Ollama
-
-- **Windows:** Feche o aplicativo Ollama ou pressione `Ctrl+C` no terminal onde `ollama serve` está rodando.
-- **macOS/Linux:** Pressione `Ctrl+C` no terminal onde `ollama serve` está rodando.
-
-### Parar o n8n (se utilizado)
-
-Pressione `Ctrl+C` no terminal onde o n8n está rodando ou execute `docker stop n8n`.
+- **PostgreSQL:** [../../README.md#parar-os-containers](../../README.md#parar-os-containers)
+- **Ollama:** [ollama-setup.md](ollama-setup.md)
+- **n8n:** [n8n-setup.md](n8n-setup.md)
+- O backend é encerrado com `Ctrl+C` no terminal onde está rodando.
