@@ -4,10 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.mindjournal.config.RagIngestionProperties;
+import com.mindjournal.config.RagRetrievalProperties;
 import com.mindjournal.dto.SourceDTO;
-import com.mindjournal.entity.Attachment;
-import com.mindjournal.entity.Document;
 import com.mindjournal.service.embedding.EmbeddingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,15 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
-import vector.rag.entity.DocumentChunk;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
-import org.springframework.test.util.ReflectionTestUtils;
-
 import vector.rag.repository.DocumentChunkRepository;
 import vector.rag.repository.RelevantChunkProjection;
 
@@ -39,185 +28,134 @@ class RagServiceTest {
     @Mock
     private DocumentChunkRepository chunkRepository;
 
-    private RagIngestionProperties properties;
-
+    private RagRetrievalProperties retrievalProperties;
     private RagService ragService;
 
     @BeforeEach
     void setUp() {
-        properties = new RagIngestionProperties();
-        ragService = new RagService(embeddingService, chunkRepository, properties);
+        retrievalProperties = new RagRetrievalProperties();
+        retrievalProperties.setTopK(3);
+        retrievalProperties.setMinSimilarity(0.70);
+        ragService = new RagService(embeddingService, chunkRepository, retrievalProperties);
     }
 
     @Test
-    @DisplayName("retrieveContext retorna sources com score real quando encontra chunks relevantes")
-    void retrieveContextWithRelevantChunks() {
-        when(embeddingService.generateEmbedding("qual o significado da vida?"))
-                .thenReturn(new float[768]);
+    @DisplayName("RagService usa topK configurado")
+    void usesConfiguredTopK() {
+        float[] embedding = new float[768];
+        embedding[0] = 0.5f;
+        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
+        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
+                .thenReturn(List.of());
 
-        Document document = createDocument(5L, "documento.pdf");
-        List<Object[]> results = Arrays.asList(
-                row(document, 1L, "trecho um", 0, 0.92),
-                row(document, 2L, "trecho dois", 1, 0.85)
-        );
+        ragService.retrieveContext(1L, "consulta");
 
-        when(chunkRepository.findRelevantChunksWithScore(
-                any(float[].class), anyFloat(), any(Pageable.class)
-        )).thenReturn(results);
-
-        RagService.RagContext context = ragService.retrieveContext("qual o significado da vida?");
-
-        assertEquals(2, context.sources().size());
-
-        SourceDTO first = context.sources().get(0);
-        assertEquals(5L, first.documentId());
-        assertEquals("documento.pdf", first.fileName());
-        assertEquals(1L, first.chunkId());
-        assertEquals("trecho um", first.content());
-        assertEquals(0.92, first.similarityScore(), 0.001);
-
-        SourceDTO second = context.sources().get(1);
-        assertEquals(0.85, second.similarityScore(), 0.001);
+        verify(chunkRepository).findRelevantChunks(eq(1L), eq(embedding), eq(0.70), argThat(p ->
+                ((Pageable) p).getPageSize() == 3
+        ));
     }
 
     @Test
-    @DisplayName("retrieveContext retorna lista vazia quando nenhum chunk atinge o limite de similaridade")
-    void retrieveContextWithoutResults() {
-        when(embeddingService.generateEmbedding("pergunta sem contexto"))
-                .thenReturn(new float[768]);
+    @DisplayName("RagService usa minSimilarity configurado")
+    void usesConfiguredMinSimilarity() {
+        retrievalProperties.setMinSimilarity(0.50);
+        float[] embedding = new float[768];
+        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
+        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
+                .thenReturn(List.of());
 
-        when(chunkRepository.findRelevantChunksWithScore(
-                any(float[].class), anyFloat(), any(Pageable.class)
-        )).thenReturn(Arrays.asList());
+        ragService.retrieveContext(1L, "consulta");
 
-        RagService.RagContext context = ragService.retrieveContext("pergunta sem contexto");
-
-        assertTrue(context.sources().isEmpty());
-        assertTrue(context.content().isEmpty());
+        verify(chunkRepository).findRelevantChunks(eq(1L), eq(embedding), eq(0.50), any());
     }
 
     @Test
-    @DisplayName("retrieveContext respeita o limite TOP_K configurado")
-    void retrieveContextRespectsTopK() {
-        properties.getRetrieval().setTopK(1);
+    @DisplayName("RagService passa sessionId ao repository")
+    void passesSessionIdToRepository() {
+        float[] embedding = new float[768];
+        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
+        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
+                .thenReturn(List.of());
 
-        when(embeddingService.generateEmbedding("teste topk"))
-                .thenReturn(new float[768]);
+        ragService.retrieveContext(42L, "consulta");
 
-        Document document = createDocument(5L, "doc.pdf");
-        List<Object[]> results = Arrays.asList(
-                row(document, 1L, "mais relevante", 0, 0.95),
-                row(document, 2L, "menos relevante", 1, 0.80)
-        );
-
-        when(chunkRepository.findRelevantChunksWithScore(
-                any(float[].class), anyFloat(), any(Pageable.class)
-        )).thenReturn(results);
-
-        RagService.RagContext context = ragService.retrieveContext("teste topk");
-
-        assertEquals(2, context.sources().size());
+        verify(chunkRepository).findRelevantChunks(eq(42L), any(), anyDouble(), any());
     }
 
     @Test
-    @DisplayName("retrieveContext usa o MIN_SIMILARITY configurado na consulta")
-    void retrieveContextUsesConfiguredMinSimilarity() {
-        properties.getRetrieval().setMinSimilarity(0.50);
+    @DisplayName("RagService preserva ordem dos resultados")
+    void preservesResultOrder() {
+        float[] embedding = new float[768];
+        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
 
-        when(embeddingService.generateEmbedding("teste minSimilarity"))
-                .thenReturn(new float[768]);
+        var result1 = new RelevantChunkProjection(1L, "a.txt", 10L, "texto1", 0.95);
+        var result2 = new RelevantChunkProjection(1L, "a.txt", 11L, "texto2", 0.80);
+        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
+                .thenReturn(List.of(result1, result2));
 
-        when(chunkRepository.findRelevantChunksWithScore(
-                any(float[].class), eq(0.50f), any(Pageable.class)
-        )).thenReturn(Arrays.asList());
+        RagContext ctx = ragService.retrieveContext(1L, "consulta");
 
-        RagService.RagContext context = ragService.retrieveContext("teste minSimilarity");
-
-        assertTrue(context.sources().isEmpty());
-        verify(chunkRepository).findRelevantChunksWithScore(
-                any(float[].class), eq(0.50f), any(Pageable.class)
-        );
+        assertEquals(2, ctx.sources().size());
+        assertEquals(0.95, ctx.sources().get(0).similarityScore());
+        assertEquals(0.80, ctx.sources().get(1).similarityScore());
     }
 
     @Test
-    @DisplayName("retrieveContext retorna score real em vez de valor fictício")
-    void retrieveContextReturnsRealScore() {
-        when(embeddingService.generateEmbedding("score real"))
-                .thenReturn(new float[768]);
+    @DisplayName("RagService retorna score real do repository")
+    void returnsRealScore() {
+        float[] embedding = new float[768];
+        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
 
-        Document document = createDocument(5L, "doc.pdf");
-        List<Object[]> results = new ArrayList<>();
-        results.add(row(document, 5L, "conteudo do chunk", 0, 0.87));
+        var result = new RelevantChunkProjection(1L, "a.txt", 10L, "texto", 0.8723);
+        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
+                .thenReturn(List.of(result));
 
-        when(chunkRepository.findRelevantChunksWithScore(
-                any(float[].class), anyFloat(), any(Pageable.class)
-        )).thenReturn(results);
+        RagContext ctx = ragService.retrieveContext(1L, "consulta");
 
-        RagService.RagContext context = ragService.retrieveContext("score real");
-
-        assertEquals(1, context.sources().size());
-        assertEquals(0.87, context.sources().get(0).similarityScore(), 0.001);
-        assertNotEquals(0.99, context.sources().get(0).similarityScore(), 0.001);
+        assertEquals(0.8723, ctx.sources().get(0).similarityScore(), 0.0001);
     }
 
     @Test
-    @DisplayName("retrieveContext retorna chunks ordenados do mais relevante para o menos relevante")
-    void retrieveContextReturnsChunksOrderedByScoreDesc() {
-        when(embeddingService.generateEmbedding("ordenacao"))
-                .thenReturn(new float[768]);
+    @DisplayName("RagService retorna lista vazia quando não há chunks")
+    void returnsEmptyWhenNoChunks() {
+        float[] embedding = new float[768];
+        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
+        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
+                .thenReturn(List.of());
 
-        Document document = createDocument(5L, "doc.pdf");
-        List<Object[]> results = Arrays.asList(
-                row(document, 1L, "primeiro", 0, 0.95),
-                row(document, 2L, "segundo", 1, 0.85),
-                row(document, 3L, "terceiro", 2, 0.70)
-        );
+        RagContext ctx = ragService.retrieveContext(1L, "consulta");
 
-        when(chunkRepository.findRelevantChunksWithScore(
-                any(float[].class), anyFloat(), any(Pageable.class)
-        )).thenReturn(results);
-
-        RagService.RagContext context = ragService.retrieveContext("ordenacao");
-
-        List<SourceDTO> sources = context.sources();
-        assertEquals(0.95, sources.get(0).similarityScore(), 0.001);
-        assertEquals(0.85, sources.get(1).similarityScore(), 0.001);
-        assertEquals(0.70, sources.get(2).similarityScore(), 0.001);
+        assertTrue(ctx.sources().isEmpty());
+        assertTrue(ctx.context().isEmpty());
     }
 
     @Test
-    @DisplayName("retrieveContext retorna null ou lista vazia quando repository retorna null")
-    void retrieveContextWhenRepositoryReturnsNull() {
-        when(embeddingService.generateEmbedding("teste null"))
-                .thenReturn(new float[768]);
+    @DisplayName("RagService propaga falha do EmbeddingService")
+    void propagatesEmbeddingFailure() {
+        when(embeddingService.generateEmbedding(anyString()))
+                .thenThrow(new RuntimeException("Falha no Ollama"));
 
-        when(chunkRepository.findRelevantChunksWithScore(
-                any(float[].class), anyFloat(), any(Pageable.class)
-        )).thenReturn(null);
-
-        RagService.RagContext context = ragService.retrieveContext("teste null");
-
-        assertTrue(context.sources().isEmpty());
-        assertTrue(context.content().isEmpty());
+        assertThrows(RuntimeException.class,
+            () -> ragService.retrieveContext(1L, "consulta"));
     }
 
-    private static Document createDocument(Long id, String filename) {
-        Attachment attachment = new Attachment();
-        attachment.setId(id);
-        attachment.setFilename(filename);
+    @Test
+    @DisplayName("RagService mapeia campos corretamente")
+    void mapsFieldsCorrectly() {
+        float[] embedding = new float[768];
+        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
 
-        Document document = new Document();
-        document.setAttachment(attachment);
-        ReflectionTestUtils.setField(document, "id", id);
-        return document;
-    }
+        var result = new RelevantChunkProjection(5L, "teste-rag.txt", 10L, "Trecho utilizado", 0.87);
+        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
+                .thenReturn(List.of(result));
 
-    @SuppressWarnings("unchecked")
-    private static Object[] row(Document document, Long chunkId, String content, int index, double score) {
-        DocumentChunk chunk = mock(DocumentChunk.class);
-        lenient().when(chunk.getId()).thenReturn(chunkId);
-        lenient().when(chunk.getDocument()).thenReturn(document);
-        lenient().when(chunk.getContent()).thenReturn(content);
-        return new Object[]{chunk, score};
+        RagContext ctx = ragService.retrieveContext(1L, "consulta");
+        SourceDTO dto = ctx.sources().get(0);
+
+        assertEquals(5L, dto.documentId());
+        assertEquals("teste-rag.txt", dto.fileName());
+        assertEquals(10L, dto.chunkId());
+        assertEquals("Trecho utilizado", dto.content());
+        assertEquals(0.87, dto.similarityScore(), 0.0001);
     }
 }

@@ -21,6 +21,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import com.mindjournal.service.rag.RagContext;
+import com.mindjournal.service.rag.RagService;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -79,8 +81,8 @@ class ChatServiceRagTest {
         List<SourceDTO> sources = List.of(
                 new SourceDTO(5L, "doc.pdf", 22L, "trecho relevante", 0.92)
         );
-        RagService.RagContext ragContext = new RagService.RagContext("trecho relevante", sources);
-        when(ragService.retrieveContext("Minha pergunta")).thenReturn(ragContext);
+        RagContext ragContext = new RagContext("trecho relevante", sources);
+        when(ragService.retrieveContext(10L, "Minha pergunta")).thenReturn(ragContext);
 
         when(aiResponseGenerator.generateResponse(eq(10L), eq("Minha pergunta"), anyString()))
                 .thenReturn("Resposta da IA");
@@ -109,8 +111,8 @@ class ChatServiceRagTest {
 
         when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
 
-        RagService.RagContext emptyContext = new RagService.RagContext("", Collections.emptyList());
-        when(ragService.retrieveContext("Minha pergunta")).thenReturn(emptyContext);
+        RagContext emptyContext = new RagContext("", Collections.emptyList());
+        when(ragService.retrieveContext(10L, "Minha pergunta")).thenReturn(emptyContext);
 
         when(aiResponseGenerator.generateResponse(eq(10L), eq("Minha pergunta"), anyString()))
                 .thenReturn("Resposta sem contexto");
@@ -169,7 +171,7 @@ class ChatServiceRagTest {
                 .thenReturn(userMsg);
 
         when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
-        when(ragService.retrieveContext("Minha pergunta"))
+        when(ragService.retrieveContext(10L, "Minha pergunta"))
                 .thenThrow(new EmbeddingException("Falha no embedding"));
 
         assertThrows(EmbeddingException.class, () -> chatService.sendMessage(request));

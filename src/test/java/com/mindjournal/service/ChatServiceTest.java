@@ -61,7 +61,7 @@ class ChatServiceTest {
                 .thenReturn(mock(MessageResponse.class));
         when(ragService.retrieveContext(42L, "minha mensagem"))
                 .thenReturn(new RagContext("", List.of()));
-        when(aiResponseGenerator.generateResponse(42L, "minha mensagem"))
+        when(aiResponseGenerator.generateResponse(42L, "minha mensagem", ""))
                 .thenReturn("resposta");
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
                 .thenReturn(mock(MessageResponse.class));
@@ -85,7 +85,7 @@ class ChatServiceTest {
         var source = new SourceDTO(5L, "doc.txt", 10L, "conteudo", 0.87);
         when(ragService.retrieveContext(anyLong(), anyString()))
                 .thenReturn(new RagContext("conteudo", List.of(source)));
-        when(aiResponseGenerator.generateResponse(anyLong(), anyString()))
+        when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
                 .thenReturn("resposta");
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
                 .thenReturn(mock(MessageResponse.class));
@@ -106,7 +106,7 @@ class ChatServiceTest {
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
                 .thenReturn(mock(MessageResponse.class));
-        when(aiResponseGenerator.generateResponse(anyLong(), anyString()))
+        when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
                 .thenReturn("resposta");
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
                 .thenReturn(mock(MessageResponse.class));
@@ -125,7 +125,7 @@ class ChatServiceTest {
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
                 .thenReturn(mock(MessageResponse.class));
-        when(aiResponseGenerator.generateResponse(anyLong(), anyString()))
+        when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
                 .thenReturn("resposta");
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
                 .thenReturn(mock(MessageResponse.class));
@@ -133,6 +133,64 @@ class ChatServiceTest {
         ChatResponse response = chatService.sendMessage(new ChatRequest(1L, "teste"));
 
         assertNotNull(response.sources());
+    }
+
+    @Test
+    @DisplayName("ChatService passa contexto vazio quando não há RagService")
+    void passesEmptyContextWithoutRagService() {
+        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
+        Session session = new Session("Teste");
+        session.setId(1L);
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+        when(aiResponseGenerator.generateResponse(1L, "teste", ""))
+                .thenReturn("resposta");
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+
+        ChatResponse response = chatService.sendMessage(new ChatRequest(1L, "teste"));
+
+        assertTrue(response.sources().isEmpty());
+    }
+
+    @Test
+    @DisplayName("ChatService passa contexto do RagService ao gerador")
+    void passesRagContextToGenerator() {
+        when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
+        Session session = new Session("Teste");
+        session.setId(1L);
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+
+        var source = new SourceDTO(1L, "doc.txt", 2L, "conteudo recuperado", 0.95);
+        when(ragService.retrieveContext(anyLong(), anyString()))
+                .thenReturn(new RagContext("conteudo recuperado", List.of(source)));
+        when(aiResponseGenerator.generateResponse(1L, "minha pergunta", "conteudo recuperado"))
+                .thenReturn("resposta baseada no contexto");
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+
+        ChatResponse response = chatService.sendMessage(new ChatRequest(1L, "minha pergunta"));
+
+        assertEquals("conteudo recuperado", response.sources().get(0).content());
+    }
+
+    @Test
+    @DisplayName("falha do gerador não é transformada em resposta válida")
+    void generatorFailurePropagates() {
+        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
+        Session session = new Session("Teste");
+        session.setId(1L);
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+        when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
+                .thenThrow(new RuntimeException("Falha no Ollama"));
+
+        assertThrows(RuntimeException.class,
+            () -> chatService.sendMessage(new ChatRequest(1L, "teste")));
     }
 
     @Test

@@ -1,18 +1,14 @@
 package com.mindjournal.service.rag;
 
-import com.mindjournal.config.RagIngestionProperties;
 import com.mindjournal.config.RagRetrievalProperties;
 import com.mindjournal.dto.SourceDTO;
 import com.mindjournal.service.embedding.EmbeddingService;
 import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import vector.rag.entity.DocumentChunk;
 import vector.rag.repository.DocumentChunkRepository;
 import vector.rag.repository.RelevantChunkProjection;
 
-import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -21,44 +17,38 @@ public class RagService {
 
     private final EmbeddingService embeddingService;
     private final DocumentChunkRepository chunkRepository;
-    private final RagIngestionProperties properties;
+    private final RagRetrievalProperties retrievalProperties;
 
-    public RagService(
-            EmbeddingService embeddingService,
-            DocumentChunkRepository chunkRepository,
-            RagIngestionProperties properties
-    ) {
+    public RagService(EmbeddingService embeddingService,
+                      DocumentChunkRepository chunkRepository,
+                      RagRetrievalProperties retrievalProperties) {
         this.embeddingService = embeddingService;
         this.chunkRepository = chunkRepository;
-        this.properties = properties;
+        this.retrievalProperties = retrievalProperties;
     }
 
-    @Transactional(readOnly = true)
-    public RagContext retrieveContext(String userQuery) {
+    public RagContext retrieveContext(Long sessionId, String userQuery) {
         float[] vector = embeddingService.generateEmbedding(userQuery);
 
-        int topK = properties.getRetrieval().getTopK();
-        float minSimilarity = (float) properties.getRetrieval().getMinSimilarity();
+        int topK = retrievalProperties.getTopK();
+        double minSimilarity = retrievalProperties.getMinSimilarity();
 
-        List<Object[]> results = chunkRepository.findRelevantChunksWithScore(
-                vector, minSimilarity, PageRequest.of(0, topK)
+        List<RelevantChunkProjection> results = chunkRepository.findRelevantChunks(
+            sessionId,
+            vector,
+            minSimilarity,
+            PageRequest.of(0, topK)
         );
 
-        if (results == null || results.isEmpty()) {
-            return new RagContext("", Collections.emptyList());
-        }
-
-        List<SourceDTO> sources = results.stream().map(row -> {
-            DocumentChunk chunk = (DocumentChunk) row[0];
-            double score = (Double) row[1];
-            return new SourceDTO(
-                    chunk.getDocument().getId(),
-                    chunk.getDocument().getAttachment().getFilename(),
-                    chunk.getId(),
-                    chunk.getContent(),
-                    score
-            );
-        }).collect(Collectors.toList());
+        List<SourceDTO> sources = results.stream()
+                .map(r -> new SourceDTO(
+                        r.documentId(),
+                        r.fileName(),
+                        r.chunkId(),
+                        r.content(),
+                        r.similarityScore()
+                ))
+                .toList();
 
         String combinedContent = sources.stream()
                 .map(SourceDTO::content)
