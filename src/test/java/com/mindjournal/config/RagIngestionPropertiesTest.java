@@ -74,5 +74,40 @@ class RagIngestionPropertiesTest {
         assertEquals(1000, props.getChunk().getMaxSize());
         assertEquals(200, props.getChunk().getOverlap());
         assertEquals(768, props.getEmbedding().getDimension());
+        assertEquals(3, props.getRetrieval().getTopK());
+        assertEquals(0.70, props.getRetrieval().getMinSimilarity(), 0.001);
+    }
+
+    @Test
+    @DisplayName("topK <= 0 lança exceção")
+    void topKMustBePositive() {
+        var props = new RagIngestionProperties();
+        props.getChunk().setMaxSize(100);
+        props.getChunk().setOverlap(10);
+        props.getEmbedding().setDimension(768);
+        props.getRetrieval().setTopK(0);
+        assertThrows(IllegalStateException.class, props::validate);
+    }
+
+    @Test
+    @DisplayName("minSimilarity negativo lança exceção")
+    void minSimilarityMustNotBeNegative() {
+        var props = new RagIngestionProperties();
+        props.getChunk().setMaxSize(100);
+        props.getChunk().setOverlap(10);
+        props.getEmbedding().setDimension(768);
+        props.getRetrieval().setMinSimilarity(-0.1);
+        assertThrows(IllegalStateException.class, props::validate);
+    }
+
+    @Test
+    @DisplayName("minSimilarity acima de 1.0 lança exceção")
+    void minSimilarityMustNotExceedOne() {
+        var props = new RagIngestionProperties();
+        props.getChunk().setMaxSize(100);
+        props.getChunk().setOverlap(10);
+        props.getEmbedding().setDimension(768);
+        props.getRetrieval().setMinSimilarity(1.1);
+        assertThrows(IllegalStateException.class, props::validate);
     }
 }
