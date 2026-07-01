@@ -12,6 +12,7 @@ import com.mindjournal.entity.MessageRole;
 import com.mindjournal.entity.Session;
 import com.mindjournal.exception.EmbeddingException;
 import com.mindjournal.exception.SessionNotFoundException;
+import com.mindjournal.repository.MessageRepository;
 import com.mindjournal.repository.SessionRepository;
 import com.mindjournal.service.rag.RagService;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +48,12 @@ class ChatServiceRagTest {
     @Mock
     private ObjectProvider<RagService> ragServiceProvider;
 
+    @Mock
+    private MessageRepository messageRepository;
+
+    @Mock
+    private TitleGeneratorService titleGeneratorService;
+
     private ChatService chatService;
 
     private Session session;
@@ -55,7 +62,8 @@ class ChatServiceRagTest {
     @BeforeEach
     void setUp() {
         chatService = new ChatService(
-                sessionRepository, messageService, aiResponseGenerator, ragServiceProvider
+                sessionRepository, messageService, aiResponseGenerator, ragServiceProvider,
+                messageRepository, titleGeneratorService
         );
 
         session = new Session();
@@ -70,6 +78,7 @@ class ChatServiceRagTest {
     @Test
     @DisplayName("sendMessage retorna ChatResponse com sources quando RagService está disponível e encontra chunks")
     void sendMessageWithRagServiceAndSources() {
+        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
@@ -103,6 +112,7 @@ class ChatServiceRagTest {
     @Test
     @DisplayName("sendMessage retorna sources vazio quando RagService não encontra chunks relevantes")
     void sendMessageWithRagServiceAndEmptySources() {
+        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
@@ -129,6 +139,7 @@ class ChatServiceRagTest {
     @Test
     @DisplayName("sendMessage retorna sources vazio quando RagService não está disponível")
     void sendMessageWithoutRagService() {
+        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
@@ -164,6 +175,7 @@ class ChatServiceRagTest {
     @Test
     @DisplayName("sendMessage propaga EmbeddingException do RagService")
     void sendMessagePropagatesEmbeddingException() {
+        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
@@ -180,6 +192,7 @@ class ChatServiceRagTest {
     @Test
     @DisplayName("sendMessage propaga exceção do AiResponseGenerator")
     void sendMessagePropagatesAiResponseException() {
+        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());

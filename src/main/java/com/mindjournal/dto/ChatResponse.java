@@ -5,5 +5,6 @@ import java.util.List;
 public record ChatResponse(
     MessageResponse userMessage,
     MessageResponse assistantMessage,
-    List<SourceDTO> sources
+    List<SourceDTO> sources,
+    String sessionTitle
 ) {}
