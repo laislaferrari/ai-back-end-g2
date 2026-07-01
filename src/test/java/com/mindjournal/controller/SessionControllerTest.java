@@ -17,9 +17,13 @@ import com.mindjournal.repository.AttachmentRepository;
 import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.repository.MessageRepository;
 import com.mindjournal.repository.SessionRepository;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +54,20 @@ class SessionControllerTest {
 
     @Autowired
     private DocumentRepository documentRepository;
+
+    private final List<Path> tempFiles = new ArrayList<>();
+
+    @AfterEach
+    void cleanTempFiles() {
+        for (Path path : tempFiles) {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException e) {
+                // ignora — o arquivo pode já ter sido excluído pelo teste
+            }
+        }
+        tempFiles.clear();
+    }
 
     @Test
     @DisplayName("DELETE /api/sessions/{id} retorna 204 para sessão existente")
@@ -147,6 +165,8 @@ class SessionControllerTest {
         Files.createDirectories(uploadDir);
         Path filePath = uploadDir.resolve("fisico_" + System.nanoTime() + ".txt");
         Files.writeString(filePath, "conteúdo");
+
+        tempFiles.add(filePath);
 
         Attachment attachment = new Attachment();
         attachment.setSession(session);

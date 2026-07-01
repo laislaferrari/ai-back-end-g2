@@ -14,6 +14,9 @@ import com.mindjournal.repository.SessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 
@@ -88,6 +91,15 @@ public class SessionService {
 
         List<Attachment> attachments = attachmentRepository.findBySessionId(id);
         for (Attachment attachment : attachments) {
+            String filePath = attachment.getFilePath();
+            if (filePath != null && !filePath.isBlank()) {
+                try {
+                    Files.deleteIfExists(Path.of(filePath));
+                } catch (IOException e) {
+                    throw new RuntimeException(
+                        "Erro ao excluir arquivo físico: " + filePath, e);
+                }
+            }
             documentRepository.findByAttachmentId(attachment.getId())
                 .ifPresent(documentRepository::delete);
             attachmentRepository.delete(attachment);
