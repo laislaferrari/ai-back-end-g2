@@ -65,6 +65,7 @@ class ChatServiceRagTest {
                 sessionRepository, messageService, aiResponseGenerator, ragServiceProvider,
                 messageRepository, titleGeneratorService
         );
+        lenient().when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
 
         session = new Session();
         session.setId(10L);
@@ -78,7 +79,6 @@ class ChatServiceRagTest {
     @Test
     @DisplayName("sendMessage retorna ChatResponse com sources quando RagService está disponível e encontra chunks")
     void sendMessageWithRagServiceAndSources() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
@@ -112,7 +112,6 @@ class ChatServiceRagTest {
     @Test
     @DisplayName("sendMessage retorna sources vazio quando RagService não encontra chunks relevantes")
     void sendMessageWithRagServiceAndEmptySources() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
@@ -139,7 +138,6 @@ class ChatServiceRagTest {
     @Test
     @DisplayName("sendMessage retorna sources vazio quando RagService não está disponível")
     void sendMessageWithoutRagService() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
@@ -175,7 +173,6 @@ class ChatServiceRagTest {
     @Test
     @DisplayName("sendMessage propaga EmbeddingException do RagService")
     void sendMessagePropagatesEmbeddingException() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
@@ -192,7 +189,6 @@ class ChatServiceRagTest {
     @Test
     @DisplayName("sendMessage propaga exceção do AiResponseGenerator")
     void sendMessagePropagatesAiResponseException() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());

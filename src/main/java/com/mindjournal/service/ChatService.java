@@ -89,6 +89,12 @@ public class ChatService {
     }
 
     private void generateAndSetTitle(Session session, String content) {
+        String currentTitle = session.getTitle();
+        boolean isDefaultTitle = currentTitle == null || currentTitle.isBlank()
+                || "Nova sessão".equals(currentTitle.trim());
+        if (!isDefaultTitle) {
+            return;
+        }
         try {
             String title = titleGeneratorService.generateTitle(content);
             session.setTitle(title);

@@ -1,6 +1,7 @@
 package com.mindjournal.service;
 
 import com.mindjournal.dto.AttachmentDTO;
+import com.mindjournal.dto.AttachmentDetailDTO;
 import com.mindjournal.dto.AttachmentInput;
 import com.mindjournal.entity.Attachment;
 import com.mindjournal.entity.AttachmentType;
@@ -11,9 +12,8 @@ import com.mindjournal.exception.SessionNotFoundException;
 import com.mindjournal.repository.AttachmentRepository;
 import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.repository.SessionRepository;
-import com.mindjournal.service.rag.DocumentIngestionService;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -30,7 +31,7 @@ public class AttachmentService {
     private final SessionRepository sessionRepository;
     private final DocumentRepository documentRepository;
     private final TransactionTemplate transactionTemplate;
-    private final ObjectProvider<DocumentIngestionService> ingestionServiceProvider;
+    private final AsyncIngestionService asyncIngestionService;
     private final String UPLOAD_DIR = "uploads/";
     private final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -40,13 +41,13 @@ public class AttachmentService {
         SessionRepository sessionRepository,
         DocumentRepository documentRepository,
         TransactionTemplate transactionTemplate,
-        ObjectProvider<DocumentIngestionService> ingestionServiceProvider
+        AsyncIngestionService asyncIngestionService
     ) {
         this.attachmentRepository = attachmentRepository;
         this.sessionRepository = sessionRepository;
         this.documentRepository = documentRepository;
         this.transactionTemplate = transactionTemplate;
-        this.ingestionServiceProvider = ingestionServiceProvider;
+        this.asyncIngestionService = asyncIngestionService;
     }
 
     public AttachmentDTO uploadAttachment(AttachmentInput input) {
@@ -84,11 +85,8 @@ public class AttachmentService {
             return documentRepository.save(doc);
         });
 
-        // 6. Disparar ingestão (em transação separada, após o commit acima)
-        DocumentIngestionService ingestionService = ingestionServiceProvider.getIfAvailable();
-        if (ingestionService != null) {
-            ingestionService.ingest(document.getId());
-        }
+        // 6. Disparar ingestão de forma assíncrona (não bloqueia a resposta HTTP)
+        asyncIngestionService.processIngestion(document.getId());
 
         return new AttachmentDTO(
                 document.getAttachment().getId(),
@@ -100,6 +98,53 @@ public class AttachmentService {
                 document.getId()
         );
     }
+
+    @Transactional(readOnly = true)
+    public List<AttachmentDetailDTO> listAttachmentsBySession(Long sessionId) {
+        if (!sessionRepository.existsById(sessionId)) {
+            throw new SessionNotFoundException(sessionId);
+        }
+
+        List<Attachment> attachments = attachmentRepository.findBySessionId(sessionId);
+
+        return attachments.stream()
+                .map(att -> {
+                    Document doc = documentRepository.findByAttachmentId(att.getId()).orElse(null);
+                    return new AttachmentDetailDTO(
+                            att.getId(),
+                            sessionId,
+                            att.getFilename(),
+                            att.getType(),
+                            att.getSize(),
+                            att.getUploadDate(),
+                            doc != null ? doc.getId() : null,
+                            doc != null ? doc.getStatus() : null,
+                            doc != null ? doc.getErrorMessage() : null
+                    );
+                })
+                .sorted((a, b) -> b.uploadDate().compareTo(a.uploadDate()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AttachmentFileData getAttachmentFile(Long attachmentId) {
+        Attachment attachment = attachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new RuntimeException("Anexo não encontrado: " + attachmentId));
+
+        Path filePath = Path.of(attachment.getFilePath());
+        if (!Files.exists(filePath)) {
+            throw new RuntimeException("Arquivo físico não encontrado: " + attachment.getFilePath());
+        }
+
+        String contentType = switch (attachment.getType()) {
+            case TXT -> "text/plain";
+            case PDF -> "application/pdf";
+        };
+
+        return new AttachmentFileData(filePath, attachment.getFilename(), contentType);
+    }
+
+    public record AttachmentFileData(Path path, String filename, String contentType) {}
 
     private AttachmentType validateAndGetType(String filename, String mimeType) {
         if (filename == null || mimeType == null) {
