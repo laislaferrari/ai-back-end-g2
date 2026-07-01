@@ -14,6 +14,7 @@ import com.mindjournal.repository.SessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -69,6 +70,15 @@ public class SessionService {
             .stream()
             .map(this::toMessageResponse)
             .toList();
+    }
+
+    @Transactional
+    public SessionResponse updateTitle(Long sessionId, String newTitle) {
+        Session session = findSession(sessionId);
+        session.setTitle(newTitle.trim());
+        session.setUpdatedAt(Instant.now());
+        Session saved = sessionRepository.save(session);
+        return toSessionResponse(saved);
     }
 
     @Transactional

@@ -3,6 +3,7 @@ package com.mindjournal.controller;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,6 +17,8 @@ import com.mindjournal.repository.AttachmentRepository;
 import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.repository.MessageRepository;
 import com.mindjournal.repository.SessionRepository;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,7 +54,7 @@ class SessionControllerTest {
     @Test
     @DisplayName("DELETE /api/sessions/{id} retorna 204 para sessão existente")
     void deleteExistingSessionReturns204() throws Exception {
-        Session session = sessionRepository.save(new Session("Sess\u00e3o Teste"));
+        Session session = sessionRepository.save(new Session("Sessão Teste"));
 
         mockMvc.perform(delete("/api/sessions/{id}", session.getId()))
             .andExpect(status().isNoContent());
@@ -61,13 +65,13 @@ class SessionControllerTest {
     void deleteNonExistentSessionReturns404() throws Exception {
         mockMvc.perform(delete("/api/sessions/{id}", 999L))
             .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.title").value("Sess\u00e3o n\u00e3o encontrada"));
+            .andExpect(jsonPath("$.title").value("Sessão não encontrada"));
     }
 
     @Test
-    @DisplayName("sess\u00e3o exclu\u00edda desaparece da listagem")
+    @DisplayName("sessão excluída desaparece da listagem")
     void deletedSessionDisappearsFromListing() throws Exception {
-        Session session = sessionRepository.save(new Session("Sess\u00e3o Teste"));
+        Session session = sessionRepository.save(new Session("Sessão Teste"));
 
         mockMvc.perform(delete("/api/sessions/{id}", session.getId()));
 
@@ -75,23 +79,21 @@ class SessionControllerTest {
     }
 
     @Test
-    @DisplayName("mensagens relacionadas s\u00e3o removidas ao excluir sess\u00e3o")
+    @DisplayName("mensagens relacionadas são removidas ao excluir sessão")
     void deletesMessagesOfSession() throws Exception {
-        Session session = sessionRepository.save(new Session("Sess\u00e3o Teste"));
-        messageRepository.save(new Message("Conte\u00fado", MessageRole.USER, session));
+        Session session = sessionRepository.save(new Session("Sessão Teste"));
+        messageRepository.save(new Message("Conteúdo", MessageRole.USER, session));
 
         mockMvc.perform(delete("/api/sessions/{id}", session.getId()))
             .andExpect(status().isNoContent());
 
-        assertTrue(
-            messageRepository.findBySession_IdOrderByTimestampAsc(session.getId()).isEmpty()
-        );
+        assertTrue(messageRepository.findBySession_IdOrderByTimestampAsc(session.getId()).isEmpty());
     }
 
     @Test
-    @DisplayName("attachments e documents s\u00e3o removidos ao excluir sess\u00e3o")
+    @DisplayName("attachments e documents são removidos ao excluir sessão")
     void deletesAttachmentsAndDocuments() throws Exception {
-        Session session = sessionRepository.save(new Session("Sess\u00e3o Teste"));
+        Session session = sessionRepository.save(new Session("Sessão Teste"));
 
         Attachment attachment = new Attachment();
         attachment.setSession(session);
@@ -113,10 +115,10 @@ class SessionControllerTest {
     }
 
     @Test
-    @DisplayName("outras sess\u00f5es permanecem intactas ap\u00f3s exclus\u00e3o")
+    @DisplayName("outras sessões permanecem intactas após exclusão")
     void otherSessionsRemainIntact() throws Exception {
-        Session session1 = sessionRepository.save(new Session("Sess\u00e3o 1"));
-        Session session2 = sessionRepository.save(new Session("Sess\u00e3o 2"));
+        Session session1 = sessionRepository.save(new Session("Sessão 1"));
+        Session session2 = sessionRepository.save(new Session("Sessão 2"));
 
         mockMvc.perform(delete("/api/sessions/{id}", session1.getId()))
             .andExpect(status().isNoContent());
@@ -125,14 +127,88 @@ class SessionControllerTest {
     }
 
     @Test
-    @DisplayName("segunda exclus\u00e3o do mesmo ID retorna 404")
+    @DisplayName("segunda exclusão do mesmo ID retorna 404")
     void secondDeletionReturns404() throws Exception {
-        Session session = sessionRepository.save(new Session("Sess\u00e3o Teste"));
+        Session session = sessionRepository.save(new Session("Sessão Teste"));
 
         mockMvc.perform(delete("/api/sessions/{id}", session.getId()))
             .andExpect(status().isNoContent());
 
         mockMvc.perform(delete("/api/sessions/{id}", session.getId()))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/sessions/{id} remove arquivos físicos dos anexos")
+    void deleteSessionRemovesPhysicalFiles() throws Exception {
+        Session session = sessionRepository.save(new Session("Sessão Teste"));
+
+        Path uploadDir = Path.of("uploads");
+        Files.createDirectories(uploadDir);
+        Path filePath = uploadDir.resolve("fisico_" + System.nanoTime() + ".txt");
+        Files.writeString(filePath, "conteúdo");
+
+        Attachment attachment = new Attachment();
+        attachment.setSession(session);
+        attachment.setFilename("fisico.txt");
+        attachment.setType(AttachmentType.TXT);
+        attachment.setSize(100L);
+        attachment.setFilePath(filePath.toString());
+        attachment.setUploadDate(Instant.now());
+        attachmentRepository.save(attachment);
+
+        assertTrue(Files.exists(filePath));
+
+        mockMvc.perform(delete("/api/sessions/{id}", session.getId()))
+            .andExpect(status().isNoContent());
+
+        assertFalse(Files.exists(filePath));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/sessions/{id}/title atualiza título")
+    void updateTitleReturnsUpdatedSession() throws Exception {
+        Session session = sessionRepository.save(new Session("Nova sessão"));
+
+        mockMvc.perform(patch("/api/sessions/{id}/title", session.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"Meu novo título\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(session.getId()))
+            .andExpect(jsonPath("$.title").value("Meu novo título"));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/sessions/{id}/title retorna 400 para título vazio")
+    void updateTitleRejectsEmptyTitle() throws Exception {
+        Session session = sessionRepository.save(new Session("Nova sessão"));
+
+        mockMvc.perform(patch("/api/sessions/{id}/title", session.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.title").value("Dados inválidos"));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/sessions/{id}/title retorna 400 para título muito longo")
+    void updateTitleRejectsTitleTooLong() throws Exception {
+        Session session = sessionRepository.save(new Session("Nova sessão"));
+        String longTitle = "a".repeat(151);
+
+        mockMvc.perform(patch("/api/sessions/{id}/title", session.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"" + longTitle + "\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/sessions/{id}/title retorna 404 para sessão inexistente")
+    void updateTitleReturns404ForNonExistentSession() throws Exception {
+        mockMvc.perform(patch("/api/sessions/{id}/title", 999L)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"Título\"}"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.title").value("Sessão não encontrada"));
     }
 }

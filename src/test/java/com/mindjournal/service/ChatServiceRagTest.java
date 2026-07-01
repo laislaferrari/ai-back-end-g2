@@ -12,6 +12,7 @@ import com.mindjournal.entity.MessageRole;
 import com.mindjournal.entity.Session;
 import com.mindjournal.exception.EmbeddingException;
 import com.mindjournal.exception.SessionNotFoundException;
+import com.mindjournal.repository.MessageRepository;
 import com.mindjournal.repository.SessionRepository;
 import com.mindjournal.service.rag.RagService;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +48,12 @@ class ChatServiceRagTest {
     @Mock
     private ObjectProvider<RagService> ragServiceProvider;
 
+    @Mock
+    private MessageRepository messageRepository;
+
+    @Mock
+    private TitleGeneratorService titleGeneratorService;
+
     private ChatService chatService;
 
     private Session session;
@@ -55,8 +62,10 @@ class ChatServiceRagTest {
     @BeforeEach
     void setUp() {
         chatService = new ChatService(
-                sessionRepository, messageService, aiResponseGenerator, ragServiceProvider
+                sessionRepository, messageService, aiResponseGenerator, ragServiceProvider,
+                messageRepository, titleGeneratorService
         );
+        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
 
         session = new Session();
         session.setId(10L);

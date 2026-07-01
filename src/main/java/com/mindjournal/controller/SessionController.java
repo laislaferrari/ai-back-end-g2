@@ -3,12 +3,14 @@ package com.mindjournal.controller;
 import com.mindjournal.dto.CreateSessionRequest;
 import com.mindjournal.dto.MessageResponse;
 import com.mindjournal.dto.SessionResponse;
+import com.mindjournal.dto.UpdateTitleRequest;
 import com.mindjournal.service.SessionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -57,6 +59,15 @@ public class SessionController {
         return ResponseEntity.ok(
             sessionService.getMessagesBySessionId(id)
         );
+    }
+
+    @PatchMapping("/{id}/title")
+    public ResponseEntity<SessionResponse> updateTitle(
+        @PathVariable Long id,
+        @Valid @RequestBody UpdateTitleRequest request
+    ) {
+        SessionResponse session = sessionService.updateTitle(id, request.title());
+        return ResponseEntity.ok(session);
     }
 
     @DeleteMapping("/{id}")

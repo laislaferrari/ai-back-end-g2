@@ -11,6 +11,7 @@ import com.mindjournal.dto.SourceDTO;
 import com.mindjournal.entity.MessageRole;
 import com.mindjournal.entity.Session;
 import com.mindjournal.exception.SessionNotFoundException;
+import com.mindjournal.repository.MessageRepository;
 import com.mindjournal.repository.SessionRepository;
 import com.mindjournal.service.rag.RagContext;
 import com.mindjournal.service.rag.RagService;
@@ -42,12 +43,20 @@ class ChatServiceTest {
     @Mock
     private RagService ragService;
 
+    @Mock
+    private MessageRepository messageRepository;
+
+    @Mock
+    private TitleGeneratorService titleGeneratorService;
+
     private ChatService chatService;
 
     @BeforeEach
     void setUp() {
         chatService = new ChatService(sessionRepository, messageService,
-                aiResponseGenerator, ragServiceProvider);
+                aiResponseGenerator, ragServiceProvider,
+                messageRepository, titleGeneratorService);
+        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
     }
 
     @Test
@@ -200,5 +209,71 @@ class ChatServiceTest {
 
         assertThrows(SessionNotFoundException.class,
             () -> chatService.sendMessage(new ChatRequest(99L, "msg")));
+    }
+
+    @Test
+    @DisplayName("título automático é gerado na primeira mensagem")
+    void titleGeneratedOnFirstMessage() {
+        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
+        Session session = new Session("Nova sessão");
+        session.setId(1L);
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(messageRepository.countBySession_IdAndRole(1L, MessageRole.USER)).thenReturn(0L);
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+        when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
+                .thenReturn("resposta");
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+        when(titleGeneratorService.generateTitle("primeira mensagem")).thenReturn("Título criado");
+
+        ChatResponse response = chatService.sendMessage(new ChatRequest(1L, "primeira mensagem"));
+
+        assertEquals("Título criado", response.sessionTitle());
+        verify(titleGeneratorService).generateTitle("primeira mensagem");
+    }
+
+    @Test
+    @DisplayName("título automático não é gerado na segunda mensagem")
+    void titleNotGeneratedOnSecondMessage() {
+        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
+        Session session = new Session("Nova sessão");
+        session.setId(1L);
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(messageRepository.countBySession_IdAndRole(1L, MessageRole.USER)).thenReturn(1L);
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+        when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
+                .thenReturn("resposta");
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+
+        ChatResponse response = chatService.sendMessage(new ChatRequest(1L, "segunda mensagem"));
+
+        assertEquals("Nova sessão", response.sessionTitle());
+        verify(titleGeneratorService, never()).generateTitle(anyString());
+    }
+
+    @Test
+    @DisplayName("falha na geração do título não impede o chat")
+    void titleFailureDoesNotBlockChat() {
+        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
+        Session session = new Session("Nova sessão");
+        session.setId(1L);
+        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
+        when(messageRepository.countBySession_IdAndRole(1L, MessageRole.USER)).thenReturn(0L);
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+        when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
+                .thenReturn("resposta");
+        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
+                .thenReturn(mock(MessageResponse.class));
+        when(titleGeneratorService.generateTitle(anyString())).thenThrow(new RuntimeException("Falha na IA"));
+
+        ChatResponse response = chatService.sendMessage(new ChatRequest(1L, "minha mensagem"));
+
+        assertNotNull(response);
+        assertEquals("Nova sessão", response.sessionTitle());
+        assertNotNull(response.assistantMessage());
     }
 }
