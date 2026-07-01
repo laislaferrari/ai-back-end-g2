@@ -3,9 +3,12 @@ package com.mindjournal.service;
 import com.mindjournal.dto.CreateSessionRequest;
 import com.mindjournal.dto.MessageResponse;
 import com.mindjournal.dto.SessionResponse;
+import com.mindjournal.entity.Attachment;
 import com.mindjournal.entity.Message;
 import com.mindjournal.entity.Session;
 import com.mindjournal.exception.SessionNotFoundException;
+import com.mindjournal.repository.AttachmentRepository;
+import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.repository.MessageRepository;
 import com.mindjournal.repository.SessionRepository;
 import org.springframework.stereotype.Service;
@@ -18,13 +21,19 @@ public class SessionService {
 
     private final SessionRepository sessionRepository;
     private final MessageRepository messageRepository;
+    private final AttachmentRepository attachmentRepository;
+    private final DocumentRepository documentRepository;
 
     public SessionService(
         SessionRepository sessionRepository,
-        MessageRepository messageRepository
+        MessageRepository messageRepository,
+        AttachmentRepository attachmentRepository,
+        DocumentRepository documentRepository
     ) {
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
+        this.attachmentRepository = attachmentRepository;
+        this.documentRepository = documentRepository;
     }
 
     @Transactional
@@ -60,6 +69,23 @@ public class SessionService {
             .stream()
             .map(this::toMessageResponse)
             .toList();
+    }
+
+    @Transactional
+    public void deleteSession(Long id) {
+        Session session = sessionRepository.findById(id)
+            .orElseThrow(() -> new SessionNotFoundException(id));
+
+        List<Attachment> attachments = attachmentRepository.findBySessionId(id);
+        for (Attachment attachment : attachments) {
+            documentRepository.findByAttachmentId(attachment.getId())
+                .ifPresent(documentRepository::delete);
+            attachmentRepository.delete(attachment);
+        }
+
+        messageRepository.deleteBySession_Id(id);
+
+        sessionRepository.delete(session);
     }
 
     private Session findSession(Long id) {

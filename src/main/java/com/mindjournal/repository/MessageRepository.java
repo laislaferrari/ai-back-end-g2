@@ -8,4 +8,6 @@ import java.util.List;
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
     List<Message> findBySession_IdOrderByTimestampAsc(Long sessionId);
+
+    void deleteBySession_Id(Long sessionId);
 }
