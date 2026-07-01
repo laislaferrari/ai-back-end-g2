@@ -171,8 +171,8 @@ class ChatServiceRagTest {
     }
 
     @Test
-    @DisplayName("sendMessage propaga EmbeddingException do RagService")
-    void sendMessagePropagatesEmbeddingException() {
+    @DisplayName("sendMessage continua sem contexto quando RagService lança EmbeddingException")
+    void sendMessageContinuesWithoutContextOnEmbeddingException() {
         when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
 
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
@@ -183,7 +183,17 @@ class ChatServiceRagTest {
         when(ragService.retrieveContext(10L, "Minha pergunta"))
                 .thenThrow(new EmbeddingException("Falha no embedding"));
 
-        assertThrows(EmbeddingException.class, () -> chatService.sendMessage(request));
+        when(aiResponseGenerator.generateResponse(eq(10L), eq("Minha pergunta"), eq("")))
+                .thenReturn("Resposta sem contexto");
+
+        MessageResponse assistantMsg = new MessageResponse(2L, "Resposta sem contexto", MessageRole.ASSISTANT, Instant.now());
+        when(messageService.createAndSaveMessage(session, MessageRole.ASSISTANT, "Resposta sem contexto"))
+                .thenReturn(assistantMsg);
+
+        ChatResponse response = chatService.sendMessage(request);
+
+        assertTrue(response.sources().isEmpty());
+        assertEquals("Resposta sem contexto", response.assistantMessage().content());
     }
 
     @Test

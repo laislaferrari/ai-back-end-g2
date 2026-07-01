@@ -67,9 +67,15 @@ public class ChatService {
         List<SourceDTO> sources;
         String context;
         if (ragService != null) {
-            RagContext ragContext = ragService.retrieveContext(session.getId(), request.content());
-            sources = ragContext.sources();
-            context = ragContext.context();
+            try {
+                RagContext ragContext = ragService.retrieveContext(session.getId(), request.content());
+                sources = ragContext.sources();
+                context = ragContext.context();
+            } catch (Exception e) {
+                log.warn("Falha ao recuperar contexto RAG, continuando sem contexto.", e);
+                sources = Collections.emptyList();
+                context = "";
+            }
         } else {
             sources = Collections.emptyList();
             context = "";

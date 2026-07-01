@@ -11,6 +11,8 @@ import com.mindjournal.repository.AttachmentRepository;
 import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.repository.MessageRepository;
 import com.mindjournal.repository.SessionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,8 @@ import java.util.List;
 
 @Service
 public class SessionService {
+
+    private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
     private final SessionRepository sessionRepository;
     private final MessageRepository messageRepository;
@@ -96,8 +100,7 @@ public class SessionService {
                 try {
                     Files.deleteIfExists(Path.of(filePath));
                 } catch (IOException e) {
-                    throw new RuntimeException(
-                        "Erro ao excluir arquivo físico: " + filePath, e);
+                    log.warn("Não foi possível excluir o arquivo físico: {}", filePath, e);
                 }
             }
             documentRepository.findByAttachmentId(attachment.getId())

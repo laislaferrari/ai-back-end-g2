@@ -1,5 +1,7 @@
 package com.mindjournal.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +13,8 @@ import java.time.Instant;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(SessionNotFoundException.class)
     public ProblemDetail handleSessionNotFound(
@@ -96,12 +100,27 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(GenerationException.class)
     public ProblemDetail handleGeneration(GenerationException exception) {
+        log.error("Falha na geração de resposta da IA", exception);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
             HttpStatus.BAD_GATEWAY,
             "O servi\u00e7o de intelig\u00eancia artificial temporariamente indispon\u00edvel. Tente novamente mais tarde."
         );
 
         problem.setTitle("Falha na gera\u00e7\u00e3o de resposta");
+        problem.setProperty("timestamp", java.time.Instant.now());
+
+        return problem;
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleUnexpected(Exception exception) {
+        log.error("Erro interno inesperado", exception);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "Erro interno inesperado. Tente novamente mais tarde."
+        );
+
+        problem.setTitle("Erro interno");
         problem.setProperty("timestamp", java.time.Instant.now());
 
         return problem;

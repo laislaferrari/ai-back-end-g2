@@ -2,6 +2,7 @@ target/
 data/
 uploads/
 *.log
+*.err
 .idea/
 .vscode/
 .classpath
