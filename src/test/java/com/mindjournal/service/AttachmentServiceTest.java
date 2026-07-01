@@ -16,7 +16,6 @@ import com.mindjournal.exception.SessionNotFoundException;
 import com.mindjournal.repository.AttachmentRepository;
 import com.mindjournal.repository.DocumentRepository;
 import com.mindjournal.repository.SessionRepository;
-import com.mindjournal.service.rag.DocumentIngestionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,7 +25,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -52,7 +50,7 @@ class AttachmentServiceTest {
     private TransactionTemplate transactionTemplate;
 
     @Mock
-    private ObjectProvider<DocumentIngestionService> ingestionServiceProvider;
+    private AsyncIngestionService asyncIngestionService;
 
     @Captor
     private ArgumentCaptor<Document> documentCaptor;
@@ -72,7 +70,7 @@ class AttachmentServiceTest {
     void setUp() {
         service = new AttachmentService(
             attachmentRepository, sessionRepository, documentRepository,
-            transactionTemplate, ingestionServiceProvider
+            transactionTemplate, asyncIngestionService
         );
 
         session = new Session("Título");
@@ -125,8 +123,6 @@ class AttachmentServiceTest {
             TransactionCallback<Document> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
         });
-
-        when(ingestionServiceProvider.getIfAvailable()).thenReturn(null);
 
         AttachmentDTO result = service.uploadAttachment(input);
 

@@ -67,9 +67,15 @@ public class ChatService {
         List<SourceDTO> sources;
         String context;
         if (ragService != null) {
-            RagContext ragContext = ragService.retrieveContext(session.getId(), request.content());
-            sources = ragContext.sources();
-            context = ragContext.context();
+            try {
+                RagContext ragContext = ragService.retrieveContext(session.getId(), request.content());
+                sources = ragContext.sources();
+                context = ragContext.context();
+            } catch (Exception e) {
+                log.warn("Falha ao recuperar contexto RAG, continuando sem contexto.", e);
+                sources = Collections.emptyList();
+                context = "";
+            }
         } else {
             sources = Collections.emptyList();
             context = "";
@@ -89,6 +95,12 @@ public class ChatService {
     }
 
     private void generateAndSetTitle(Session session, String content) {
+        String currentTitle = session.getTitle();
+        boolean isDefaultTitle = currentTitle == null || currentTitle.isBlank()
+                || "Nova sessão".equals(currentTitle.trim());
+        if (!isDefaultTitle) {
+            return;
+        }
         try {
             String title = titleGeneratorService.generateTitle(content);
             session.setTitle(title);

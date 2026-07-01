@@ -56,12 +56,12 @@ class ChatServiceTest {
         chatService = new ChatService(sessionRepository, messageService,
                 aiResponseGenerator, ragServiceProvider,
                 messageRepository, titleGeneratorService);
+        lenient().when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
     }
 
     @Test
     @DisplayName("ChatService chama RagService com a sessão correta")
     void callsRagServiceWithCorrectSession() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
         Session session = new Session("Teste");
         session.setId(42L);
@@ -84,7 +84,6 @@ class ChatServiceTest {
     @Test
     @DisplayName("ChatService inclui sources na ChatResponse")
     void includesSourcesInResponse() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
         Session session = new Session("Teste");
         session.setId(1L);
@@ -110,7 +109,6 @@ class ChatServiceTest {
     @Test
     @DisplayName("ChatService funciona sem RagService no profile H2")
     void worksWithoutRagService() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(ragServiceProvider.getIfAvailable()).thenReturn(null);
         Session session = new Session("Teste");
         session.setId(1L);
@@ -130,7 +128,6 @@ class ChatServiceTest {
     @Test
     @DisplayName("ChatResponse nunca retorna sources como null")
     void sourcesNeverNull() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(ragServiceProvider.getIfAvailable()).thenReturn(null);
         Session session = new Session("Teste");
         session.setId(1L);
@@ -150,7 +147,6 @@ class ChatServiceTest {
     @Test
     @DisplayName("ChatService passa contexto vazio quando não há RagService")
     void passesEmptyContextWithoutRagService() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(ragServiceProvider.getIfAvailable()).thenReturn(null);
         Session session = new Session("Teste");
         session.setId(1L);
@@ -170,7 +166,6 @@ class ChatServiceTest {
     @Test
     @DisplayName("ChatService passa contexto do RagService ao gerador")
     void passesRagContextToGenerator() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
         Session session = new Session("Teste");
         session.setId(1L);
@@ -194,7 +189,6 @@ class ChatServiceTest {
     @Test
     @DisplayName("falha do gerador não é transformada em resposta válida")
     void generatorFailurePropagates() {
-        when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
         when(ragServiceProvider.getIfAvailable()).thenReturn(null);
         Session session = new Session("Teste");
         session.setId(1L);
