@@ -23,13 +23,10 @@ public class TitleGeneratorService {
     private final OllamaGenerationProperties properties;
     private final boolean ollamaAvailable;
 
-    public TitleGeneratorService(OllamaGenerationProperties properties) {
-        this.properties = properties;
-        this.restTemplate = new RestTemplate();
-        this.ollamaAvailable = true;
-    }
-
-    TitleGeneratorService(OllamaGenerationProperties properties, RestTemplate restTemplate) {
+    public TitleGeneratorService(
+        OllamaGenerationProperties properties,
+        RestTemplate restTemplate
+    ) {
         this.properties = properties;
         this.restTemplate = restTemplate;
         this.ollamaAvailable = true;

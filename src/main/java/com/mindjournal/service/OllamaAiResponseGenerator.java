@@ -2,11 +2,12 @@ package com.mindjournal.service;
 
 import com.mindjournal.config.OllamaGenerationProperties;
 import com.mindjournal.exception.GenerationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
@@ -15,6 +16,8 @@ import java.util.List;
 @Service
 @Profile("postgres & !test")
 public class OllamaAiResponseGenerator implements AiResponseGenerator {
+
+    private static final Logger log = LoggerFactory.getLogger(OllamaAiResponseGenerator.class);
 
     private static final String SYSTEM_PROMPT = """
         Voc\u00ea \u00e9 o MindJourney, um assistente acolhedor de um di\u00e1rio inteligente.
@@ -34,13 +37,10 @@ public class OllamaAiResponseGenerator implements AiResponseGenerator {
     private final RestTemplate restTemplate;
     private final OllamaGenerationProperties properties;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    public OllamaAiResponseGenerator(OllamaGenerationProperties properties) {
-        this.properties = properties;
-        this.restTemplate = new RestTemplate();
-    }
-
-    OllamaAiResponseGenerator(OllamaGenerationProperties properties, RestTemplate restTemplate) {
+    public OllamaAiResponseGenerator(
+        OllamaGenerationProperties properties,
+        RestTemplate restTemplate
+    ) {
         this.properties = properties;
         this.restTemplate = restTemplate;
     }
@@ -57,8 +57,11 @@ public class OllamaAiResponseGenerator implements AiResponseGenerator {
 
             ResponseEntity<ChatResponse> res = restTemplate.exchange(req, ChatResponse.class);
             response = res.getBody();
-        } catch (RestClientException e) {
-            throw new GenerationException("Falha de conex\u00e3o com o servi\u00e7o de gera\u00e7\u00e3o.", e);
+        } catch (Exception e) {
+            log.error("Falha ao comunicar com o Ollama em {}", properties.getOllamaUrl(), e);
+            throw new GenerationException(
+                "Falha de comunicação com o serviço de inteligência artificial.", e
+            );
         }
 
         if (response == null) {
