@@ -14,7 +14,7 @@ public class RestTemplateConfig {
     public RestTemplate ollamaRestTemplate(RestTemplateBuilder builder) {
         return builder
             .connectTimeout(Duration.ofSeconds(10))
-            .readTimeout(Duration.ofSeconds(60))
+            .readTimeout(Duration.ofSeconds(180))
             .build();
     }
 }
