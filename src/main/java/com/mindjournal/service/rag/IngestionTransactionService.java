@@ -2,20 +2,18 @@ package com.mindjournal.service.rag;
 
 import com.mindjournal.entity.AttachmentType;
 import com.mindjournal.entity.Document;
+import com.mindjournal.entity.DocumentChunk;
 import com.mindjournal.entity.DocumentStatus;
 import com.mindjournal.exception.DocumentNotFoundException;
+import com.mindjournal.repository.DocumentChunkRepository;
 import com.mindjournal.repository.DocumentRepository;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import vector.rag.entity.DocumentChunk;
-import vector.rag.repository.DocumentChunkRepository;
 
 import java.util.List;
 
 @Service
-@Profile("postgres")
 public class IngestionTransactionService {
 
     private final DocumentRepository documentRepository;

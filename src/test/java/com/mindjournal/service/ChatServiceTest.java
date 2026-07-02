@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 
 @ExtendWith(MockitoExtension.class)
 class ChatServiceTest {
@@ -36,9 +35,6 @@ class ChatServiceTest {
 
     @Mock
     private AiResponseGenerator aiResponseGenerator;
-
-    @Mock
-    private ObjectProvider<RagService> ragServiceProvider;
 
     @Mock
     private RagService ragService;
@@ -54,7 +50,7 @@ class ChatServiceTest {
     @BeforeEach
     void setUp() {
         chatService = new ChatService(sessionRepository, messageService,
-                aiResponseGenerator, ragServiceProvider,
+                aiResponseGenerator, ragService,
                 messageRepository, titleGeneratorService);
         lenient().when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
     }
@@ -62,7 +58,6 @@ class ChatServiceTest {
     @Test
     @DisplayName("ChatService chama RagService com a sessão correta")
     void callsRagServiceWithCorrectSession() {
-        when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
         Session session = new Session("Teste");
         session.setId(42L);
         when(sessionRepository.findById(42L)).thenReturn(Optional.of(session));
@@ -84,7 +79,6 @@ class ChatServiceTest {
     @Test
     @DisplayName("ChatService inclui sources na ChatResponse")
     void includesSourcesInResponse() {
-        when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
         Session session = new Session("Teste");
         session.setId(1L);
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
@@ -107,33 +101,15 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("ChatService funciona sem RagService no profile H2")
-    void worksWithoutRagService() {
-        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
-        Session session = new Session("Teste");
-        session.setId(1L);
-        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
-        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
-                .thenReturn(mock(MessageResponse.class));
-        when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
-                .thenReturn("resposta");
-        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
-                .thenReturn(mock(MessageResponse.class));
-
-        ChatResponse response = chatService.sendMessage(new ChatRequest(1L, "teste"));
-
-        assertTrue(response.sources().isEmpty());
-    }
-
-    @Test
     @DisplayName("ChatResponse nunca retorna sources como null")
     void sourcesNeverNull() {
-        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
         Session session = new Session("Teste");
         session.setId(1L);
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
                 .thenReturn(mock(MessageResponse.class));
+        when(ragService.retrieveContext(anyLong(), anyString()))
+                .thenReturn(new RagContext("", List.of()));
         when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
                 .thenReturn("resposta");
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
@@ -145,28 +121,8 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("ChatService passa contexto vazio quando não há RagService")
-    void passesEmptyContextWithoutRagService() {
-        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
-        Session session = new Session("Teste");
-        session.setId(1L);
-        when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
-        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
-                .thenReturn(mock(MessageResponse.class));
-        when(aiResponseGenerator.generateResponse(1L, "teste", ""))
-                .thenReturn("resposta");
-        when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
-                .thenReturn(mock(MessageResponse.class));
-
-        ChatResponse response = chatService.sendMessage(new ChatRequest(1L, "teste"));
-
-        assertTrue(response.sources().isEmpty());
-    }
-
-    @Test
     @DisplayName("ChatService passa contexto do RagService ao gerador")
     void passesRagContextToGenerator() {
-        when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
         Session session = new Session("Teste");
         session.setId(1L);
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
@@ -189,12 +145,13 @@ class ChatServiceTest {
     @Test
     @DisplayName("falha do gerador não é transformada em resposta válida")
     void generatorFailurePropagates() {
-        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
         Session session = new Session("Teste");
         session.setId(1L);
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
                 .thenReturn(mock(MessageResponse.class));
+        when(ragService.retrieveContext(anyLong(), anyString()))
+                .thenReturn(new RagContext("", List.of()));
         when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("Falha no Ollama"));
 
@@ -214,13 +171,14 @@ class ChatServiceTest {
     @Test
     @DisplayName("título automático é gerado na primeira mensagem")
     void titleGeneratedOnFirstMessage() {
-        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
         Session session = new Session("Nova sessão");
         session.setId(1L);
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(messageRepository.countBySession_IdAndRole(1L, MessageRole.USER)).thenReturn(0L);
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
                 .thenReturn(mock(MessageResponse.class));
+        when(ragService.retrieveContext(anyLong(), anyString()))
+                .thenReturn(new RagContext("", List.of()));
         when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
                 .thenReturn("resposta");
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
@@ -236,13 +194,14 @@ class ChatServiceTest {
     @Test
     @DisplayName("título automático não é gerado na segunda mensagem")
     void titleNotGeneratedOnSecondMessage() {
-        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
         Session session = new Session("Nova sessão");
         session.setId(1L);
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(messageRepository.countBySession_IdAndRole(1L, MessageRole.USER)).thenReturn(1L);
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
                 .thenReturn(mock(MessageResponse.class));
+        when(ragService.retrieveContext(anyLong(), anyString()))
+                .thenReturn(new RagContext("", List.of()));
         when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
                 .thenReturn("resposta");
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))
@@ -257,13 +216,14 @@ class ChatServiceTest {
     @Test
     @DisplayName("falha na geração do título não impede o chat")
     void titleFailureDoesNotBlockChat() {
-        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
         Session session = new Session("Nova sessão");
         session.setId(1L);
         when(sessionRepository.findById(1L)).thenReturn(Optional.of(session));
         when(messageRepository.countBySession_IdAndRole(1L, MessageRole.USER)).thenReturn(0L);
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.USER), anyString()))
                 .thenReturn(mock(MessageResponse.class));
+        when(ragService.retrieveContext(anyLong(), anyString()))
+                .thenReturn(new RagContext("", List.of()));
         when(aiResponseGenerator.generateResponse(anyLong(), anyString(), anyString()))
                 .thenReturn("resposta");
         when(messageService.createAndSaveMessage(eq(session), eq(MessageRole.ASSISTANT), anyString()))

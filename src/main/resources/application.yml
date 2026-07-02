@@ -11,7 +11,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     open-in-view: false
 
   h2:
@@ -29,3 +29,27 @@ spring:
 
 server:
   port: 8080
+
+rag:
+  chunk:
+    max-size: ${RAG_CHUNK_MAX_SIZE:1000}
+    overlap: ${RAG_CHUNK_OVERLAP:200}
+
+  embedding:
+    dimension: ${RAG_EMBEDDING_DIMENSION:768}
+
+  ollama-url: ${OLLAMA_URL:http://localhost:11434/api/embed}
+  ollama-model: ${OLLAMA_MODEL:embeddinggemma:300m}
+
+  retrieval:
+    top-k: ${RAG_TOP_K:3}
+    min-similarity: ${RAG_MIN_SIMILARITY:0.50}
+
+  generation:
+    ollama-url: ${OLLAMA_CHAT_URL:http://localhost:11434/api/chat}
+    model: ${OLLAMA_CHAT_MODEL:llama3.2:3b}
+    temperature: ${OLLAMA_CHAT_TEMPERATURE:0.2}
+
+n8n:
+  webhook:
+    document-indexed-url: ${N8N_DOCUMENT_INDEXED_URL:}

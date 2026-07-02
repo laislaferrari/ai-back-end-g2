@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     document_id BIGINT NOT NULL,
     content     TEXT NOT NULL,
     chunk_index INTEGER NOT NULL,
-    embedding   vector(768) NOT NULL,
+    embedding   TEXT NOT NULL,
     created_at  TIMESTAMP WITH TIME ZONE NOT NULL,
     CONSTRAINT fk_document_chunks_document
         FOREIGN KEY (document_id)

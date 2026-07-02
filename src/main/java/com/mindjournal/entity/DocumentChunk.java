@@ -1,21 +1,7 @@
-package vector.rag.entity;
+package com.mindjournal.entity;
 
-import com.mindjournal.entity.Document;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-import org.hibernate.annotations.Array;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
+import com.mindjournal.entity.converter.FloatArrayConverter;
+import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Objects;
@@ -46,9 +32,8 @@ public class DocumentChunk {
     @Column(name = "chunk_index", nullable = false)
     private Integer chunkIndex;
 
-    @JdbcTypeCode(SqlTypes.VECTOR)
-    @Array(length = EMBEDDING_DIMENSION)
-    @Column(name = "embedding", nullable = false)
+    @Convert(converter = FloatArrayConverter.class)
+    @Column(name = "embedding", nullable = false, columnDefinition = "TEXT")
     private float[] embedding;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -96,7 +81,6 @@ public class DocumentChunk {
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("content não pode ser vazio");
         }
-
         this.content = content;
     }
 
@@ -108,14 +92,11 @@ public class DocumentChunk {
         if (chunkIndex == null || chunkIndex < 0) {
             throw new IllegalArgumentException("chunkIndex deve ser maior ou igual a zero");
         }
-
         this.chunkIndex = chunkIndex;
     }
 
     public float[] getEmbedding() {
-        return embedding == null
-            ? null
-            : Arrays.copyOf(embedding, embedding.length);
+        return embedding == null ? null : Arrays.copyOf(embedding, embedding.length);
     }
 
     public void setEmbedding(float[] embedding) {
@@ -124,7 +105,6 @@ public class DocumentChunk {
                 "embedding deve possuir exatamente " + EMBEDDING_DIMENSION + " posições"
             );
         }
-
         this.embedding = Arrays.copyOf(embedding, embedding.length);
     }
 

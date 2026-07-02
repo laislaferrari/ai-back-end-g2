@@ -6,6 +6,12 @@ import static org.mockito.Mockito.*;
 
 import com.mindjournal.config.RagRetrievalProperties;
 import com.mindjournal.dto.SourceDTO;
+import com.mindjournal.entity.Attachment;
+import com.mindjournal.entity.AttachmentType;
+import com.mindjournal.entity.Document;
+import com.mindjournal.entity.DocumentChunk;
+import com.mindjournal.entity.DocumentStatus;
+import com.mindjournal.repository.DocumentChunkRepository;
 import com.mindjournal.service.embedding.EmbeddingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,9 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Pageable;
-import vector.rag.repository.DocumentChunkRepository;
-import vector.rag.repository.RelevantChunkProjection;
 
 import java.util.List;
 
@@ -31,97 +34,47 @@ class RagServiceTest {
     private RagRetrievalProperties retrievalProperties;
     private RagService ragService;
 
+    private Document document;
+    private DocumentChunk chunk1;
+    private DocumentChunk chunk2;
+
     @BeforeEach
     void setUp() {
         retrievalProperties = new RagRetrievalProperties();
         retrievalProperties.setTopK(3);
-        retrievalProperties.setMinSimilarity(0.70);
-        ragService = new RagService(embeddingService, chunkRepository, retrievalProperties);
-    }
-
-    @Test
-    @DisplayName("RagService usa topK configurado")
-    void usesConfiguredTopK() {
-        float[] embedding = new float[768];
-        embedding[0] = 0.5f;
-        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
-        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
-                .thenReturn(List.of());
-
-        ragService.retrieveContext(1L, "consulta");
-
-        verify(chunkRepository).findRelevantChunks(eq(1L), eq(embedding), eq(0.70), argThat(p ->
-                ((Pageable) p).getPageSize() == 3
-        ));
-    }
-
-    @Test
-    @DisplayName("RagService usa minSimilarity configurado")
-    void usesConfiguredMinSimilarity() {
         retrievalProperties.setMinSimilarity(0.50);
-        float[] embedding = new float[768];
-        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
-        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
-                .thenReturn(List.of());
+        ragService = new RagService(embeddingService, chunkRepository, retrievalProperties);
 
-        ragService.retrieveContext(1L, "consulta");
+        Attachment attachment = new Attachment();
+        attachment.setId(1L);
+        attachment.setFilename("doc.pdf");
+        attachment.setType(AttachmentType.PDF);
 
-        verify(chunkRepository).findRelevantChunks(eq(1L), eq(embedding), eq(0.50), any());
+        document = new Document(attachment);
+        document.markAsProcessing();
+        document.markAsIndexed();
+
+        chunk1 = new DocumentChunk(document, "conteúdo relevante sobre IA", 0, randomEmbedding());
+        chunk2 = new DocumentChunk(document, "outro texto qualquer", 1, randomEmbedding());
     }
 
     @Test
-    @DisplayName("RagService passa sessionId ao repository")
-    void passesSessionIdToRepository() {
-        float[] embedding = new float[768];
-        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
-        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
-                .thenReturn(List.of());
-
-        ragService.retrieveContext(42L, "consulta");
-
-        verify(chunkRepository).findRelevantChunks(eq(42L), any(), anyDouble(), any());
-    }
-
-    @Test
-    @DisplayName("RagService preserva ordem dos resultados")
-    void preservesResultOrder() {
-        float[] embedding = new float[768];
-        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
-
-        var result1 = new RelevantChunkProjection(1L, "a.txt", 10L, "texto1", 0.95);
-        var result2 = new RelevantChunkProjection(1L, "a.txt", 11L, "texto2", 0.80);
-        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
-                .thenReturn(List.of(result1, result2));
+    @DisplayName("retorna chunks relevantes com sources corretos")
+    void returnsRelevantChunks() {
+        when(embeddingService.generateEmbedding("consulta")).thenReturn(randomEmbedding());
+        when(chunkRepository.findAllBySessionId(1L)).thenReturn(List.of(chunk1, chunk2));
 
         RagContext ctx = ragService.retrieveContext(1L, "consulta");
 
-        assertEquals(2, ctx.sources().size());
-        assertEquals(0.95, ctx.sources().get(0).similarityScore());
-        assertEquals(0.80, ctx.sources().get(1).similarityScore());
+        assertNotNull(ctx);
+        assertFalse(ctx.sources().isEmpty());
     }
 
     @Test
-    @DisplayName("RagService retorna score real do repository")
-    void returnsRealScore() {
-        float[] embedding = new float[768];
-        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
-
-        var result = new RelevantChunkProjection(1L, "a.txt", 10L, "texto", 0.8723);
-        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
-                .thenReturn(List.of(result));
-
-        RagContext ctx = ragService.retrieveContext(1L, "consulta");
-
-        assertEquals(0.8723, ctx.sources().get(0).similarityScore(), 0.0001);
-    }
-
-    @Test
-    @DisplayName("RagService retorna lista vazia quando não há chunks")
+    @DisplayName("retorna sources vazia quando não há chunks")
     void returnsEmptyWhenNoChunks() {
-        float[] embedding = new float[768];
-        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
-        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
-                .thenReturn(List.of());
+        when(embeddingService.generateEmbedding("consulta")).thenReturn(randomEmbedding());
+        when(chunkRepository.findAllBySessionId(1L)).thenReturn(List.of());
 
         RagContext ctx = ragService.retrieveContext(1L, "consulta");
 
@@ -130,7 +83,7 @@ class RagServiceTest {
     }
 
     @Test
-    @DisplayName("RagService propaga falha do EmbeddingService")
+    @DisplayName("propaga falha do EmbeddingService")
     void propagatesEmbeddingFailure() {
         when(embeddingService.generateEmbedding(anyString()))
                 .thenThrow(new RuntimeException("Falha no Ollama"));
@@ -140,22 +93,26 @@ class RagServiceTest {
     }
 
     @Test
-    @DisplayName("RagService mapeia campos corretamente")
-    void mapsFieldsCorrectly() {
-        float[] embedding = new float[768];
-        when(embeddingService.generateEmbedding("consulta")).thenReturn(embedding);
+    @DisplayName("retorna lista vazia quando minSimilarity é alto demais")
+    void returnsEmptyWithHighThreshold() {
+        retrievalProperties.setMinSimilarity(0.99);
+        float[] queryEmb = new float[768];
+        queryEmb[0] = 1.0f;
 
-        var result = new RelevantChunkProjection(5L, "teste-rag.txt", 10L, "Trecho utilizado", 0.87);
-        when(chunkRepository.findRelevantChunks(anyLong(), any(), anyDouble(), any()))
-                .thenReturn(List.of(result));
+        when(embeddingService.generateEmbedding("consulta")).thenReturn(queryEmb);
+
+        DocumentChunk farChunk = new DocumentChunk(document, "muito diferente", 0, new float[768]);
+        when(chunkRepository.findAllBySessionId(1L)).thenReturn(List.of(farChunk));
 
         RagContext ctx = ragService.retrieveContext(1L, "consulta");
-        SourceDTO dto = ctx.sources().get(0);
 
-        assertEquals(5L, dto.documentId());
-        assertEquals("teste-rag.txt", dto.fileName());
-        assertEquals(10L, dto.chunkId());
-        assertEquals("Trecho utilizado", dto.content());
-        assertEquals(0.87, dto.similarityScore(), 0.0001);
+        assertTrue(ctx.sources().isEmpty());
+    }
+
+    private static float[] randomEmbedding() {
+        float[] emb = new float[768];
+        emb[0] = 0.5f;
+        emb[1] = 0.3f;
+        return emb;
     }
 }

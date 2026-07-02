@@ -21,9 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 import com.mindjournal.service.rag.RagContext;
-import com.mindjournal.service.rag.RagService;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -46,9 +44,6 @@ class ChatServiceRagTest {
     private RagService ragService;
 
     @Mock
-    private ObjectProvider<RagService> ragServiceProvider;
-
-    @Mock
     private MessageRepository messageRepository;
 
     @Mock
@@ -62,7 +57,7 @@ class ChatServiceRagTest {
     @BeforeEach
     void setUp() {
         chatService = new ChatService(
-                sessionRepository, messageService, aiResponseGenerator, ragServiceProvider,
+                sessionRepository, messageService, aiResponseGenerator, ragService,
                 messageRepository, titleGeneratorService
         );
         lenient().when(titleGeneratorService.generateTitle(anyString())).thenReturn("Título gerado");
@@ -84,8 +79,6 @@ class ChatServiceRagTest {
         MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
         when(messageService.createAndSaveMessage(session, MessageRole.USER, "Minha pergunta"))
                 .thenReturn(userMsg);
-
-        when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
 
         List<SourceDTO> sources = List.of(
                 new SourceDTO(5L, "doc.pdf", 22L, "trecho relevante", 0.92)
@@ -118,8 +111,6 @@ class ChatServiceRagTest {
         when(messageService.createAndSaveMessage(session, MessageRole.USER, "Minha pergunta"))
                 .thenReturn(userMsg);
 
-        when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
-
         RagContext emptyContext = new RagContext("", Collections.emptyList());
         when(ragService.retrieveContext(10L, "Minha pergunta")).thenReturn(emptyContext);
 
@@ -133,30 +124,6 @@ class ChatServiceRagTest {
         ChatResponse response = chatService.sendMessage(request);
 
         assertTrue(response.sources().isEmpty());
-    }
-
-    @Test
-    @DisplayName("sendMessage retorna sources vazio quando RagService não está disponível")
-    void sendMessageWithoutRagService() {
-        when(sessionRepository.findById(10L)).thenReturn(Optional.of(session));
-
-        MessageResponse userMsg = new MessageResponse(1L, "Minha pergunta", MessageRole.USER, Instant.now());
-        when(messageService.createAndSaveMessage(session, MessageRole.USER, "Minha pergunta"))
-                .thenReturn(userMsg);
-
-        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
-
-        when(aiResponseGenerator.generateResponse(eq(10L), eq("Minha pergunta"), anyString()))
-                .thenReturn("Resposta sem RAG");
-
-        MessageResponse assistantMsg = new MessageResponse(2L, "Resposta sem RAG", MessageRole.ASSISTANT, Instant.now());
-        when(messageService.createAndSaveMessage(session, MessageRole.ASSISTANT, "Resposta sem RAG"))
-                .thenReturn(assistantMsg);
-
-        ChatResponse response = chatService.sendMessage(request);
-
-        assertTrue(response.sources().isEmpty());
-        assertEquals("Resposta sem RAG", response.assistantMessage().content());
     }
 
     @Test
@@ -179,7 +146,6 @@ class ChatServiceRagTest {
         when(messageService.createAndSaveMessage(session, MessageRole.USER, "Minha pergunta"))
                 .thenReturn(userMsg);
 
-        when(ragServiceProvider.getIfAvailable()).thenReturn(ragService);
         when(ragService.retrieveContext(10L, "Minha pergunta"))
                 .thenThrow(new EmbeddingException("Falha no embedding"));
 
@@ -205,7 +171,8 @@ class ChatServiceRagTest {
         when(messageService.createAndSaveMessage(session, MessageRole.USER, "Minha pergunta"))
                 .thenReturn(userMsg);
 
-        when(ragServiceProvider.getIfAvailable()).thenReturn(null);
+        when(ragService.retrieveContext(anyLong(), anyString()))
+                .thenReturn(new RagContext("", Collections.emptyList()));
 
         when(aiResponseGenerator.generateResponse(eq(10L), eq("Minha pergunta"), anyString()))
                 .thenThrow(new RuntimeException("Falha na geração da resposta"));

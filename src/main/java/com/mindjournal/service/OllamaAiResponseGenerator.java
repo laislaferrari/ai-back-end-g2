@@ -14,7 +14,7 @@ import java.net.URI;
 import java.util.List;
 
 @Service
-@Profile("postgres & !test")
+@Profile("!test")
 public class OllamaAiResponseGenerator implements AiResponseGenerator {
 
     private static final Logger log = LoggerFactory.getLogger(OllamaAiResponseGenerator.class);

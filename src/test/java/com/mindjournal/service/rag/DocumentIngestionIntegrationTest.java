@@ -22,8 +22,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import vector.rag.entity.DocumentChunk;
-import vector.rag.repository.DocumentChunkRepository;
+import com.mindjournal.entity.DocumentChunk;
+import com.mindjournal.repository.DocumentChunkRepository;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

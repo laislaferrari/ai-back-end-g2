@@ -42,7 +42,7 @@ class ProfileAiResponseGeneratorTest {
     void ollamaHasCorrectProfile() {
         Profile profile = OllamaAiResponseGenerator.class.getAnnotation(Profile.class);
         assertNotNull(profile);
-        assertTrue(List.of(profile.value()).contains("postgres & !test"),
-            "OllamaAiResponseGenerator deve ter profile postgres & !test");
+        assertTrue(List.of(profile.value()).contains("!test"),
+            "OllamaAiResponseGenerator deve ter profile !test");
     }
 }

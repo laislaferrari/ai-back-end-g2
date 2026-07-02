@@ -1,4 +1,4 @@
-package vector.rag.repository;
+package com.mindjournal.repository;
 
 public record RelevantChunkProjection(
     Long documentId,

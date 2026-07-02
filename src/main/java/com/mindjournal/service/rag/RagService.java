@@ -2,18 +2,22 @@ package com.mindjournal.service.rag;
 
 import com.mindjournal.config.RagRetrievalProperties;
 import com.mindjournal.dto.SourceDTO;
+import com.mindjournal.entity.DocumentChunk;
+import com.mindjournal.repository.DocumentChunkRepository;
 import com.mindjournal.service.embedding.EmbeddingService;
-import org.springframework.context.annotation.Profile;
-import org.springframework.data.domain.PageRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import vector.rag.repository.DocumentChunkRepository;
-import vector.rag.repository.RelevantChunkProjection;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
-@Profile("postgres")
 public class RagService {
+
+    private static final Logger log = LoggerFactory.getLogger(RagService.class);
 
     private final EmbeddingService embeddingService;
     private final DocumentChunkRepository chunkRepository;
@@ -27,26 +31,45 @@ public class RagService {
         this.retrievalProperties = retrievalProperties;
     }
 
+    @Transactional(readOnly = true)
     public RagContext retrieveContext(Long sessionId, String userQuery) {
-        float[] vector = embeddingService.generateEmbedding(userQuery);
+        float[] queryEmbedding = embeddingService.generateEmbedding(userQuery);
 
         int topK = retrievalProperties.getTopK();
         double minSimilarity = retrievalProperties.getMinSimilarity();
 
-        List<RelevantChunkProjection> results = chunkRepository.findRelevantChunks(
-            sessionId,
-            vector,
-            minSimilarity,
-            PageRequest.of(0, topK)
-        );
+        List<DocumentChunk> allChunks = chunkRepository.findAllBySessionId(sessionId);
 
-        List<SourceDTO> sources = results.stream()
-                .map(r -> new SourceDTO(
-                        r.documentId(),
-                        r.fileName(),
-                        r.chunkId(),
-                        r.content(),
-                        r.similarityScore()
+        log.debug("RAG: sessionId={}, totalChunks={}, topK={}, minSimilarity={}",
+                sessionId, allChunks.size(), topK, minSimilarity);
+
+        if (allChunks.isEmpty()) {
+            log.warn("RAG: nenhum chunk encontrado para sessionId={}", sessionId);
+            return new RagContext("", List.of());
+        }
+
+        List<ScoredChunk> scored = new ArrayList<>();
+        for (DocumentChunk chunk : allChunks) {
+            double similarity = cosineSimilarity(queryEmbedding, chunk.getEmbedding());
+            if (similarity >= minSimilarity) {
+                scored.add(new ScoredChunk(chunk, similarity));
+            }
+        }
+
+        scored.sort(Comparator.comparingDouble(ScoredChunk::similarity).reversed());
+
+        List<ScoredChunk> topResults = scored.size() > topK ? scored.subList(0, topK) : scored;
+
+        log.info("RAG: sessionId={}, totalChunks={}, aboveThreshold={}, returned={}",
+                sessionId, allChunks.size(), scored.size(), topResults.size());
+
+        List<SourceDTO> sources = topResults.stream()
+                .map(s -> new SourceDTO(
+                        s.chunk().getDocument().getId(),
+                        s.chunk().getDocument().getAttachment().getFilename(),
+                        s.chunk().getId(),
+                        s.chunk().getContent(),
+                        s.similarity()
                 ))
                 .toList();
 
@@ -56,4 +79,20 @@ public class RagService {
 
         return new RagContext(combinedContent, sources);
     }
+
+    private double cosineSimilarity(float[] a, float[] b) {
+        if (a == null || b == null || a.length != b.length) return 0.0;
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+        for (int i = 0; i < a.length; i++) {
+            dotProduct += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+        if (normA == 0.0 || normB == 0.0) return 0.0;
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    private record ScoredChunk(DocumentChunk chunk, double similarity) {}
 }

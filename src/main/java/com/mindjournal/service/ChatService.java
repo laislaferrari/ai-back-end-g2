@@ -13,7 +13,6 @@ import com.mindjournal.service.rag.RagContext;
 import com.mindjournal.service.rag.RagService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
@@ -28,20 +27,20 @@ public class ChatService {
     private final SessionRepository sessionRepository;
     private final MessageService messageService;
     private final AiResponseGenerator aiResponseGenerator;
-    private final ObjectProvider<RagService> ragServiceProvider;
+    private final RagService ragService;
     private final MessageRepository messageRepository;
     private final TitleGeneratorService titleGeneratorService;
 
     public ChatService(SessionRepository sessionRepository,
                        MessageService messageService,
                        AiResponseGenerator aiResponseGenerator,
-                       ObjectProvider<RagService> ragServiceProvider,
+                       RagService ragService,
                        MessageRepository messageRepository,
                        TitleGeneratorService titleGeneratorService) {
         this.sessionRepository = sessionRepository;
         this.messageService = messageService;
         this.aiResponseGenerator = aiResponseGenerator;
-        this.ragServiceProvider = ragServiceProvider;
+        this.ragService = ragService;
         this.messageRepository = messageRepository;
         this.titleGeneratorService = titleGeneratorService;
     }
@@ -63,20 +62,20 @@ public class ChatService {
             generateAndSetTitle(session, request.content());
         }
 
-        RagService ragService = ragServiceProvider.getIfAvailable();
         List<SourceDTO> sources;
         String context;
-        if (ragService != null) {
-            try {
-                RagContext ragContext = ragService.retrieveContext(session.getId(), request.content());
-                sources = ragContext.sources();
-                context = ragContext.context();
-            } catch (Exception e) {
-                log.warn("Falha ao recuperar contexto RAG, continuando sem contexto.", e);
-                sources = Collections.emptyList();
-                context = "";
+        try {
+            RagContext ragContext = ragService.retrieveContext(session.getId(), request.content());
+            sources = ragContext.sources();
+            context = ragContext.context();
+            if (!sources.isEmpty()) {
+                log.info("RAG: {} fonte(s) encontrada(s) para sessionId={}",
+                        sources.size(), session.getId());
+            } else {
+                log.info("RAG: nenhuma fonte encontrada para sessionId={}", session.getId());
             }
-        } else {
+        } catch (Exception e) {
+            log.warn("Falha ao recuperar contexto RAG, continuando sem contexto.", e);
             sources = Collections.emptyList();
             context = "";
         }
