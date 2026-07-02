@@ -33,8 +33,8 @@ class ProfileAiResponseGeneratorTest {
     void mockHasCorrectProfile() {
         Profile profile = MockAiResponseGenerator.class.getAnnotation(Profile.class);
         assertNotNull(profile);
-        assertTrue(List.of(profile.value()).contains("!postgres | test"),
-            "MockAiResponseGenerator deve ter profile !postgres | test");
+        assertTrue(List.of(profile.value()).contains("test"),
+            "MockAiResponseGenerator deve ter profile test");
     }
 
     @Test

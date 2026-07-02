@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -96,6 +97,25 @@ public class GlobalExceptionHandler {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "O arquivo enviado é muito grande. O limite máximo é de 10 MB.");
         problemDetail.setTitle("Tamanho Excedido");
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(problemDetail);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleHttpMessageNotReadable(HttpMessageNotReadableException exception) {
+        String message = "JSON inválido ou codificação incorreta. Verifique o formato dos dados enviados.";
+        if (exception.getMessage() != null) {
+            if (exception.getMessage().contains("JSON")) {
+                message = "JSON inválido. Verifique a sintaxe do corpo da requisição.";
+            } else if (exception.getMessage().contains("UTF-8") || exception.getMessage().contains("encoding")) {
+                message = "Codificação inválida. Envie os dados em UTF-8.";
+            }
+        }
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.BAD_REQUEST,
+            message
+        );
+        problem.setTitle("Dados inválidos");
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
     }
 
     @ExceptionHandler(GenerationException.class)
