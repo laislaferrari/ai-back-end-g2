@@ -6,7 +6,163 @@ Os documentos enviados passam por parsing, fragmentação, geração de embeddin
 
 > Este repositório contém o **back-end**. A infraestrutura de apoio é iniciada com Docker Compose, enquanto o Spring Boot é executado pelo Maven Wrapper. O front-end fica em um repositório separado.
 
-## Funcionalidades
+---
+
+# Execução rápida no Windows — projeto completo
+
+Passo a passo para rodar **PostgreSQL, pgvector, Ollama, n8n, back-end e front-end** juntos.
+
+## 1. Clonar os dois repositórios
+
+```powershell
+git clone https://github.com/laislaferrari/ai-back-end-g2.git
+git clone https://github.com/kevinsgoncalves/ai-front-end-g2.git
+```
+
+## 2. Abrir o Docker Desktop
+
+Abra o Docker Desktop e aguarde o Docker Engine ficar ativo.
+
+```powershell
+docker info
+```
+
+## 3. Entrar na pasta do back-end
+
+```powershell
+cd "C:\caminho\para\ai-back-end-g2"
+```
+
+## 4. Criar o `.env`
+
+```powershell
+Copy-Item .env.example .env
+```
+
+## 5. Escolher a senha do PostgreSQL
+
+No `.env`, altere o valor de `DB_PASSWORD`:
+
+```env
+DB_PASSWORD=troque_esta_senha
+```
+
+Escolha uma senha segura. Mantenha **o mesmo valor** em todo o arquivo. Você **não precisa digitar essa senha** ao executar Docker Compose ou Maven — ambos leem automaticamente do `.env`.
+
+Nunca envie o `.env` para o GitHub.
+
+## 6. Subir a infraestrutura
+
+```powershell
+docker compose up -d
+```
+
+## 7. Conferir os serviços
+
+```powershell
+docker compose ps
+```
+
+Todos os containers devem estar com status `Up`.
+
+## 8. Baixar os modelos do Ollama
+
+```powershell
+docker compose exec ollama ollama pull embeddinggemma:300m
+docker compose exec ollama ollama pull llama3.2:3b
+```
+
+## 9. Carregar o `.env` no terminal
+
+O Docker Compose lê o `.env` automaticamente, mas o Spring Boot (fora do Docker) precisa das variáveis no terminal:
+
+```powershell
+Get-Content .env | ForEach-Object {
+    if ($_ -match '^([^#][^=]*)=(.*)$') {
+        [System.Environment]::SetEnvironmentVariable(
+            $matches[1].Trim(),
+            $matches[2].Trim(),
+            'Process'
+        )
+    }
+}
+```
+
+> Esse bloco precisa ser executado **novamente em cada novo terminal** do back-end.
+
+## 10. Executar o back-end
+
+No mesmo terminal em que o `.env` foi carregado:
+
+```powershell
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=postgres"
+```
+
+Aguarde a mensagem:
+
+```
+Tomcat started on port 8080
+Started MindJournalApplication
+```
+
+O terminal fica ocupado porque o servidor está rodando. Não está travado.
+
+## 11. Testar o back-end
+
+```powershell
+Invoke-RestMethod http://localhost:8080/api/health
+```
+
+Resposta esperada: `status UP` com timestamp.
+
+## 12. Abrir um segundo terminal para o front-end
+
+```powershell
+cd "C:\caminho\para\ai-front-end-g2"
+npm install
+npm run dev
+```
+
+## 13. Acessar
+
+Abra o navegador em:
+
+```
+http://localhost:5174
+```
+
+---
+
+# Portas
+
+| Serviço | Porta |
+|---|---|
+| Back-end | 8080 |
+| Front-end | 5174 |
+| PostgreSQL / pgvector | 5433 |
+| Ollama | 11434 |
+| n8n | 5678 |
+
+---
+
+# Como parar o projeto
+
+- **Front-end:** `Ctrl + C` no terminal do Vite
+- **Back-end:** `Ctrl + C` no terminal do Maven
+- **Infraestrutura:**
+  ```powershell
+  docker compose down
+  ```
+  `docker compose down` **não apaga os dados**. Os volumes persistem.
+
+  ```powershell
+  docker compose down -v
+  ```
+  `docker compose down -v` apaga os volumes (banco, embeddings, modelos do Ollama, dados do n8n). Use **apenas conscientemente**.
+
+---
+
+# Funcionalidades
 
 - Criação, listagem e consulta de sessões
 - Exclusão completa de sessões
@@ -88,271 +244,6 @@ npm --version
 
 ---
 
-# Início rápido — projeto completo
-
-Esta é a forma recomendada para executar **PostgreSQL, pgvector, Ollama, n8n, back-end e front-end**.
-
-## 1. Clonar os dois repositórios
-
-Em uma pasta de trabalho:
-
-```powershell
-git clone https://github.com/laislaferrari/ai-back-end-g2.git
-git clone https://github.com/kevinsgoncalves/ai-front-end-g2.git
-```
-
-A estrutura ficará semelhante a:
-
-```text
-IA/
-├── ai-back-end-g2/
-└── ai-front-end-g2/
-```
-
-## 2. Abrir o Docker Desktop
-
-Abra o Docker Desktop e aguarde até o Docker Engine ficar ativo.
-
-Confira:
-
-```powershell
-docker info
-```
-
-Se o comando exibir as informações do servidor Docker, ele está pronto.
-
-## 3. Criar o `.env` do back-end
-
-Entre na pasta do back-end:
-
-```powershell
-cd "C:\caminho\para\ai-back-end-g2"
-```
-
-No Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-No macOS, Linux ou Git Bash:
-
-```bash
-cp .env.example .env
-```
-
-Conteúdo esperado:
-
-```env
-POSTGRES_DB=mindjournal
-DB_URL=jdbc:postgresql://localhost:5433/mindjournal
-DB_USERNAME=mindjournal
-DB_PASSWORD=troque_esta_senha
-SPRING_PROFILES_ACTIVE=postgres
-
-OLLAMA_URL=http://localhost:11434/api/embed
-OLLAMA_MODEL=embeddinggemma:300m
-OLLAMA_CHAT_URL=http://localhost:11434/api/chat
-OLLAMA_CHAT_MODEL=llama3.2:3b
-OLLAMA_CHAT_TEMPERATURE=0.2
-
-N8N_DOCUMENT_INDEXED_URL=
-
-RAG_TOP_K=3
-RAG_MIN_SIMILARITY=0.70
-```
-
-### Como funciona a senha do PostgreSQL
-
-A senha é definida no campo:
-
-```env
-DB_PASSWORD=troque_esta_senha
-```
-
-Escolha uma senha e mantenha o mesmo valor nesse arquivo. Você **não precisa digitar essa senha no terminal** ao executar o Docker Compose ou o back-end.
-
-O valor é usado automaticamente por dois componentes:
-
-1. O container `mindjournal-pgvector` usa a senha para criar o usuário do PostgreSQL.
-2. O Spring Boot usa a mesma senha para se conectar ao banco.
-
-O arquivo `.env` é local e não deve ser enviado para o GitHub.
-
-> Se o volume do PostgreSQL já tiver sido criado e a senha for alterada depois, a senha antiga continuará armazenada no volume. Veja a seção de troubleshooting antes de remover volumes.
-
-## 4. Subir a infraestrutura com Docker Compose
-
-Dentro da pasta do back-end:
-
-```powershell
-docker compose up -d
-```
-
-Esse comando inicia três serviços:
-
-| Serviço | Container | Porta local | Função |
-|---|---|---:|---|
-| `ollama` | `mindjournal-ollama` | `11434` | Embeddings, títulos e respostas da IA |
-| `pgvector` | `mindjournal-pgvector` | `5433` | PostgreSQL 17 com extensão vector |
-| `n8n` | `mindjournal-n8n` | `5678` | Automação opcional por webhook |
-
-Confira o estado:
-
-```powershell
-docker compose ps
-```
-
-Para acompanhar os logs:
-
-```powershell
-docker compose logs -f
-```
-
-Para acompanhar somente um serviço:
-
-```powershell
-docker compose logs -f pgvector
-docker compose logs -f ollama
-docker compose logs -f n8n
-```
-
-## 5. Baixar os modelos dentro do container Ollama
-
-Na primeira execução, baixe os dois modelos:
-
-```powershell
-docker compose exec ollama ollama pull embeddinggemma:300m
-docker compose exec ollama ollama pull llama3.2:3b
-```
-
-Confira:
-
-```powershell
-docker compose exec ollama ollama list
-```
-
-Os modelos ficam armazenados no volume `ollama_data`, portanto não precisam ser baixados novamente a cada inicialização.
-
-> Quando o Ollama é executado pelo Docker Compose, não rode `ollama serve` no Windows ao mesmo tempo. Os dois tentariam usar a porta `11434`.
-
-## 6. Carregar o `.env` no terminal do back-end
-
-O Docker Compose lê o `.env` automaticamente, mas o processo Spring Boot executado fora do Docker precisa receber essas variáveis no terminal.
-
-### Windows PowerShell
-
-```powershell
-Get-Content .env | ForEach-Object {
-    if ($_ -match '^([^#][^=]*)=(.*)$') {
-        [System.Environment]::SetEnvironmentVariable(
-            $matches[1].Trim(),
-            $matches[2].Trim(),
-            'Process'
-        )
-    }
-}
-```
-
-As variáveis são carregadas somente nesse terminal. Ao abrir outro PowerShell, execute o bloco novamente.
-
-### macOS, Linux ou Git Bash
-
-```bash
-set -a
-source .env
-set +a
-```
-
-## 7. Executar o back-end
-
-No mesmo terminal em que o `.env` foi carregado:
-
-### Windows PowerShell
-
-```powershell
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=postgres"
-```
-
-### macOS, Linux ou Git Bash
-
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
-```
-
-Aguarde uma mensagem semelhante a:
-
-```text
-Started MindJournalApplication
-```
-
-O back-end ficará disponível em:
-
-```text
-http://localhost:8080
-```
-
-Teste o health check no navegador:
-
-```text
-http://localhost:8080/api/health
-```
-
-Ou no PowerShell:
-
-```powershell
-Invoke-RestMethod http://localhost:8080/api/health
-```
-
-## 8. Executar o front-end
-
-Abra um **segundo terminal**:
-
-```powershell
-cd "C:\caminho\para\ai-front-end-g2"
-```
-
-Na primeira execução:
-
-```powershell
-Copy-Item .env.example .env.local
-npm install
-```
-
-O arquivo `.env.local` deve conter:
-
-```env
-VITE_API_URL=http://localhost:8080/api
-```
-
-Inicie o Vite:
-
-```powershell
-npm run dev
-```
-
-A interface ficará disponível em:
-
-```text
-http://localhost:5173
-```
-
-Se a porta `5173` estiver ocupada, use o endereço exibido pelo Vite no terminal.
-
-## Endereços locais
-
-| Componente | Endereço |
-|---|---|
-| Front-end | `http://localhost:5173` |
-| Back-end | `http://localhost:8080` |
-| Health | `http://localhost:8080/api/health` |
-| Ollama | `http://localhost:11434` |
-| PostgreSQL | `localhost:5433` |
-| n8n | `http://localhost:5678` |
-| H2 Console, somente perfil default | `http://localhost:8080/h2-console` |
-
----
-
 # Inicializações seguintes
 
 Depois que o projeto já tiver sido configurado uma vez, o fluxo diário é menor.
@@ -392,8 +283,8 @@ npm run dev
 
 Depois acesse:
 
-```text
-http://localhost:5173
+```
+http://localhost:5174
 ```
 
 ---
@@ -451,11 +342,9 @@ pgvector:
 - Persiste os dados no volume `pgvector_data`.
 - Executa `scripts/init-pgvector.sql` na criação inicial do banco.
 - O script garante a extensão:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
-
+  ```sql
+  CREATE EXTENSION IF NOT EXISTS vector;
+  ```
 - Possui healthcheck com `pg_isready`.
 
 ## Serviço `n8n`
@@ -491,7 +380,6 @@ volumes:
 ```
 
 Os volumes preservam:
-
 - modelos baixados pelo Ollama;
 - banco e vetores do PostgreSQL;
 - configurações e workflows do n8n.
@@ -499,7 +387,6 @@ Os volumes preservam:
 ## O que o Compose não executa
 
 O arquivo atual não cria containers para:
-
 - o back-end Spring Boot;
 - o front-end React/Vite.
 
@@ -559,7 +446,6 @@ unset SPRING_PROFILES_ACTIVE
 ```
 
 Características:
-
 - banco H2 em arquivo;
 - respostas do assistente geradas pelo mock;
 - sem embeddings;
@@ -570,19 +456,19 @@ Características:
 
 A API será iniciada em:
 
-```text
+```
 http://localhost:8080
 ```
 
 ## H2 Console
 
-```text
+```
 http://localhost:8080/h2-console
 ```
 
 Preencha:
 
-```text
+```
 JDBC URL: jdbc:h2:file:./data/mindjournal
 User Name: sa
 Password: deixe vazio
@@ -750,7 +636,6 @@ Resposta `200 OK`:
 ```
 
 Regras:
-
 - o título é obrigatório;
 - espaços nas extremidades são removidos;
 - o limite é de 150 caracteres;
@@ -770,7 +655,6 @@ Resposta:
 ```
 
 A exclusão remove:
-
 - mensagens da sessão;
 - documentos relacionados;
 - registros de anexos;
@@ -793,7 +677,7 @@ Content-Type: application/json
 }
 ```
 
-Resposta `201 Created`:
+Resposta `200 OK`:
 
 ```json
 {
@@ -817,7 +701,6 @@ Resposta `201 Created`:
 ### Título automático
 
 Na primeira mensagem do usuário:
-
 1. o serviço tenta gerar um título de 3 a 7 palavras pelo Ollama;
 2. pontuação final e aspas são removidas;
 3. o limite máximo é de 150 caracteres;
@@ -884,7 +767,7 @@ RECEIVED → PROCESSING → INDEXED
 
 O Compose disponibiliza o n8n em:
 
-```text
+```
 http://localhost:5678
 ```
 
@@ -895,7 +778,6 @@ n8n/workflows/document-indexed-notification.json
 ```
 
 Para utilizar:
-
 1. abra o n8n;
 2. importe o arquivo JSON;
 3. publique o workflow;
@@ -1013,7 +895,6 @@ docker compose logs pgvector
 ```
 
 Confirme que:
-
 - `.env` existe;
 - `POSTGRES_DB`, `DB_USERNAME` e `DB_PASSWORD` estão preenchidos;
 - a porta `5433` não está sendo usada por outro processo.
@@ -1064,8 +945,6 @@ Execute o back-end com:
 ```
 
 ## Porta `5433` ocupada
-
-Verifique:
 
 ```powershell
 netstat -ano | findstr :5433
@@ -1130,9 +1009,56 @@ netstat -ano | findstr :8080
 
 Encerre o processo anterior ou altere a porta da aplicação.
 
-## Porta `5173` ocupada
+## Porta `5174` ocupada
 
-O Vite escolherá outra porta e mostrará o endereço correto no terminal.
+Verifique qual processo está usando a porta:
+
+```powershell
+netstat -ano | findstr :5174
+```
+
+Encerre o processo ou altere a porta no `vite.config.ts` do front-end (lembre de atualizar também o CORS no back-end).
+
+## Ollama já está usando a porta `11434` localmente
+
+Feche o Ollama local antes de subir o container, ou pare o container e use a instalação local:
+
+```powershell
+docker compose stop ollama
+ollama serve
+```
+
+## ECONNREFUSED ao acessar o back-end
+
+Confirme se:
+- o back-end está rodando (veja o terminal do Maven);
+- a porta é `8080`;
+- nenhum firewall bloqueia `localhost`.
+
+## Back-end "parado" após `Started MindJournalApplication`
+
+O terminal ficou ocupado e está exibindo logs. O servidor está rodando normalmente. Role o terminal ou pressione Enter para ver o prompt do shell.
+
+Digite no navegador:
+
+```
+http://localhost:8080/api/health
+```
+
+Se responder, está funcionando.
+
+## Erro de conexão do front com o proxy
+
+O front-end usa proxy do Vite: `/api` → `http://localhost:8080`. Se o back-end não estiver rodando, o Vite retorna ECONNREFUSED. Inicie o back-end primeiro.
+
+## Necessidade de manter back, front e Docker rodando simultaneamente
+
+Sim. Este projeto requer três processos ativos ao mesmo tempo:
+1. Docker (PostgreSQL + Ollama + n8n)
+2. Back-end Spring Boot
+3. Front-end Vite (quando usando a interface web)
+
+Cada um em seu próprio terminal.
 
 ---
 
